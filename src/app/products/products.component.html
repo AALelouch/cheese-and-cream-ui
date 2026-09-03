@@ -1,0 +1,218 @@
+<div class="page">
+	<div class="page-header">
+		<div>
+			<p class="eyebrow">Inventario</p>
+			<h2>Gestion de Productos</h2>
+			<p class="subtitle">Administra tus productos y asignalos a un agente.</p>
+		</div>
+		<div class="actions">
+			<button class="btn btn-ghost" (click)="openCategoryModal(categoryModal)">Gestionar Categorias</button>
+			<button class="btn btn-primary" (click)="openProductModal(productModal)">Agregar Producto</button>
+		</div>
+	</div>
+
+	<div class="card">
+		<div class="card-header">
+			<h3>Agentes</h3>
+			<div class="pill">{{ agents.length }} activos</div>
+		</div>
+		<div class="agent-buttons">
+			<button
+				type="button"
+				class="btn btn-ghost"
+				*ngFor="let agent of agents; trackBy: trackByAgentId"
+				[class.active]="selectedAgentId === agent.id"
+				(click)="selectAgent(agent)"
+			>
+				{{ agent.name }}
+			</button>
+			<button *ngIf="selectedAgentId" type="button" class="btn btn-outline" (click)="clearAgentFilter()">Limpiar filtro</button>
+		</div>
+	</div>
+
+	<div class="card">
+		<div class="card-header">
+			<h3>{{ selectedAgentId ? 'Listado filtrado' : 'Listado' }}</h3>
+			<div class="pill">{{ products.length }} items</div>
+		</div>
+		<div *ngIf="selectedAgentId; else noAgentSelected" class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Nombre</th>
+						<th>Cantidad</th>
+						<th>Precio</th>
+						<th>Costo</th>
+						<th>Unidad</th>
+						<th>Agente</th>
+						<th>Acciones</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr *ngFor="let product of products; trackBy: trackByProductId">
+						<td>{{ product.id }}</td>
+						<td>{{ product.name }}</td>
+						<td>{{ product.quantity }}</td>
+						<td>{{ product.price | currency }}</td>
+						<td>{{ product.cost | currency }}</td>
+						<td>{{ product.unitType }}</td>
+						<td>{{ product.agentName }}</td>
+						<td>
+							<div class="row-actions">
+								<button type="button" class="btn btn-xs btn-outline" (click)="openEditProductModal(productModal, product)">Editar</button>
+								<button type="button" class="btn btn-xs btn-danger" (click)="deleteProduct(product)">Eliminar</button>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+		<ng-template #noAgentSelected>
+			<div class="empty-state">Selecciona un agente para ver sus productos.</div>
+		</ng-template>
+	</div>
+
+	<ng-template #productModal>
+		<div class="modal-header">
+			<h4 class="modal-title pull-left">{{ editingProductId ? 'Editar Producto' : 'Agregar Producto' }}</h4>
+			<button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+				<span aria-hidden="true">&times;</span>
+			</button>
+		</div>
+		<div class="modal-body">
+			<form class="form-grid" (ngSubmit)="saveProduct()">
+				<div class="form-group">
+					<label for="productName">Nombre</label>
+					<input
+						type="text"
+						id="productName"
+						class="form-control"
+						[class.is-invalid]="isProductNameInvalid()"
+						[(ngModel)]="productForm.name"
+						name="productName"
+					>
+					<span *ngIf="isProductNameInvalid()" class="field-error">Campo obligatorio.</span>
+				</div>
+				<div class="form-group">
+					<label for="productQuantity">Cantidad</label>
+					<input type="number" id="productQuantity" class="form-control" [(ngModel)]="productForm.quantity" name="productQuantity">
+				</div>
+				<div class="form-group">
+					<label for="productPrice">Precio</label>
+					<input type="number" id="productPrice" class="form-control" [(ngModel)]="productForm.price" name="productPrice">
+				</div>
+				<div class="form-group">
+					<label for="productCost">Costo</label>
+					<input type="number" id="productCost" class="form-control" [(ngModel)]="productForm.cost" name="productCost">
+				</div>
+				<div class="form-group">
+					<label for="productUnit">Unidad</label>
+					<input type="text" id="productUnit" class="form-control" [(ngModel)]="productForm.unitType" name="productUnit">
+				</div>
+				<div class="form-group">
+					<label for="productCategory">Categoria</label>
+					<select
+						id="productCategory"
+						class="form-control"
+						[class.is-invalid]="isCategoryInvalid()"
+						[(ngModel)]="productForm.categoryId"
+						name="productCategory"
+					>
+						<option [ngValue]="0" disabled>Selecciona una categoria</option>
+						<option *ngFor="let category of categories; trackBy: trackByCategoryId" [ngValue]="category.id">{{ category.name }}</option>
+					</select>
+					<span *ngIf="isCategoryInvalid()" class="field-error">Selecciona una categoria.</span>
+				</div>
+				<div class="form-group">
+					<label for="productAgent">Agente</label>
+					<select
+						id="productAgent"
+						class="form-control"
+						[class.is-invalid]="isAgentInvalid()"
+						[(ngModel)]="productForm.agendId"
+						name="productAgent"
+					>
+						<option [ngValue]="0" disabled>Selecciona un agente</option>
+						<option *ngFor="let agent of agents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
+					</select>
+					<span *ngIf="isAgentInvalid()" class="field-error">Selecciona un agente.</span>
+				</div>
+				<div class="form-actions">
+					<button type="submit" class="btn btn-primary" [disabled]="isSavingProduct">
+						{{ isSavingProduct ? 'Guardando...' : 'Guardar' }}
+					</button>
+					<button type="button" class="btn btn-ghost" (click)="modalRef?.hide()">Cancelar</button>
+				</div>
+			</form>
+			<div *ngIf="productError" class="inline-alert">
+				{{ productError }}
+			</div>
+		</div>
+	</ng-template>
+
+	<ng-template #categoryModal>
+		<div class="modal-header">
+			<h4 class="modal-title pull-left">Gestionar Categorias</h4>
+			<button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+				<span aria-hidden="true">&times;</span>
+			</button>
+		</div>
+		<div class="modal-body">
+			<form (ngSubmit)="createCategory()">
+				<div class="form-group">
+					<label for="categoryName">Nombre de la categoria</label>
+					<input
+						type="text"
+						id="categoryName"
+						class="form-control"
+						[(ngModel)]="newCategoryName"
+						name="categoryName"
+					>
+				</div>
+				<div class="modal-actions">
+					<button type="submit" class="btn btn-primary" [disabled]="!newCategoryName.trim() || isSavingCategory">
+						{{ isSavingCategory ? 'Guardando...' : 'Crear' }}
+					</button>
+				</div>
+			</form>
+			<div *ngIf="categoryError" class="inline-alert">
+				{{ categoryError }}
+			</div>
+			<hr>
+			<ul class="list-group">
+				<li *ngFor="let category of categories; trackBy: trackByCategoryId" class="list-group-item d-flex justify-content-between align-items-center">
+					<div class="type-row">
+						<div class="type-name" *ngIf="editingCategoryId !== category.id">
+							{{ category.name }}
+						</div>
+						<input
+							*ngIf="editingCategoryId === category.id"
+							type="text"
+							class="form-control type-input"
+							[(ngModel)]="editingCategoryName"
+							name="editingCategoryName-{{ category.id }}"
+						>
+					</div>
+					<div class="type-actions">
+						<ng-container *ngIf="editingCategoryId !== category.id; else editCategoryActions">
+							<button type="button" class="btn btn-xs btn-outline" (click)="startEditCategory(category)">Editar</button>
+							<button type="button" class="btn btn-xs btn-danger" (click)="deleteCategory(category)">Eliminar</button>
+						</ng-container>
+						<ng-template #editCategoryActions>
+							<button
+								type="button"
+								class="btn btn-xs btn-primary"
+								[disabled]="!editingCategoryName.trim() || isSavingCategory"
+								(click)="updateCategory(category)"
+							>
+								Guardar
+							</button>
+							<button type="button" class="btn btn-xs btn-ghost" (click)="cancelEditCategory()">Cancelar</button>
+						</ng-template>
+					</div>
+				</li>
+			</ul>
+		</div>
+	</ng-template>
+</div>

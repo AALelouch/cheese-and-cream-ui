@@ -5,10 +5,16 @@
 /tmp
 /out-tsc
 /bazel-out
+/.angular
+
 
 # Node
 /node_modules
+yarn-debug.log*
+npm-debug.log.*
 npm-debug.log
+yarn-error.log*
+pnpm-debug.log*
 yarn-error.log
 
 # IDEs and editors
@@ -30,7 +36,6 @@ yarn-error.log
 .history/*
 
 # Miscellaneous
-/.angular/cache
 .sass-cache/
 /connect.lock
 /coverage
@@ -38,7 +43,15 @@ yarn-error.log
 testem.log
 /typings
 __screenshots__/
+*.tsbuildinfo
+.eslintcache
+
+# Local environment files
+.env
+.env.*
+!.env.example
 
 # System files
 .DS_Store
 Thumbs.db
+Desktop.ini

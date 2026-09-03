@@ -1,0 +1,185 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">CRM</p>
+      <h2>Gestion de Agentes</h2>
+      <p class="subtitle">Administra clientes, identificaciones y balance desde un solo lugar.</p>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" (click)="openModal(identityTypeModal)">Gestionar Tipos de ID</button>
+      <button class="btn btn-primary" (click)="openAgentModal(agentModal)">Agregar Agente</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Listado</h3>
+      <div class="pill">{{ agents.length }} activos</div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th>Teléfono</th>
+        <th>Dirección</th>
+        <th>Balance</th>
+        <th>Tipo de ID</th>
+        <th>Número de ID</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let agent of agents; trackBy: trackByAgentId">
+        <td>{{ agent.id }}</td>
+        <td>{{ agent.name }}</td>
+        <td>{{ agent.email }}</td>
+        <td>{{ agent.phoneNumber }}</td>
+        <td>{{ agent.address }}</td>
+        <td>{{ agent.balance | currency }}</td>
+        <td>{{ getAgentIdentificationType(agent) }}</td>
+        <td>{{ agent.identificationNumber }}</td>
+        <td>
+          <div class="row-actions">
+            <button type="button" class="btn btn-xs btn-outline" (click)="openEditAgentModal(agentModal, agent)">Editar</button>
+            <button type="button" class="btn btn-xs btn-danger" (click)="deleteAgent(agent)">Eliminar</button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal para crear agente -->
+  <ng-template #agentModal>
+    <div class="modal-header">
+      <h4 class="modal-title pull-left">{{ editingAgentId ? 'Editar Agente' : 'Agregar Agente' }}</h4>
+      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form class="form-grid" (ngSubmit)="saveAgent()">
+        <div class="form-group">
+          <label for="name">Nombre</label>
+          <input
+            type="text"
+            id="name"
+            class="form-control"
+            [class.is-invalid]="isAgentNameInvalid()"
+            [(ngModel)]="agentForm.name"
+            name="name"
+          >
+          <span *ngIf="isAgentNameInvalid()" class="field-error">Campo obligatorio.</span>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" class="form-control" [(ngModel)]="agentForm.email" name="email">
+        </div>
+        <div class="form-group">
+          <label for="phoneNumber">Telefono</label>
+          <input type="text" id="phoneNumber" class="form-control" [(ngModel)]="agentForm.phoneNumber" name="phoneNumber">
+        </div>
+        <div class="form-group">
+          <label for="address">Direccion</label>
+          <input type="text" id="address" class="form-control" [(ngModel)]="agentForm.address" name="address">
+        </div>
+        <div class="form-group">
+          <label for="balance">Balance</label>
+          <input type="number" id="balance" class="form-control" [(ngModel)]="agentForm.balance" name="balance">
+        </div>
+        <div class="form-group">
+          <label for="identificationType">Tipo de Identificacion</label>
+          <select
+            id="identificationType"
+            class="form-control"
+            [class.is-invalid]="isIdentificationTypeInvalid()"
+            [(ngModel)]="agentForm.identificationTypeId"
+            name="identificationTypeId"
+          >
+            <option [ngValue]="0" disabled>Selecciona un tipo</option>
+            <option *ngFor="let type of identificationTypes; trackBy: trackByIdentificationTypeId" [ngValue]="type.id">{{ type.name }}</option>
+          </select>
+          <span *ngIf="isIdentificationTypeInvalid()" class="field-error">Selecciona un tipo.</span>
+        </div>
+        <div class="form-group">
+          <label for="identificationNumber">Numero de Identificacion</label>
+          <input type="text" id="identificationNumber" class="form-control" [(ngModel)]="agentForm.identificationNumber" name="identificationNumber">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="isSavingAgent">
+            {{ isSavingAgent ? 'Guardando...' : 'Guardar' }}
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="modalRef?.hide()">Cancelar</button>
+        </div>
+      </form>
+      <div *ngIf="agentError" class="inline-alert">
+        {{ agentError }}
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Modal para gestionar tipos de identificación -->
+  <ng-template #identityTypeModal>
+    <div class="modal-header">
+      <h4 class="modal-title pull-left">Gestionar Tipos de Identificacion</h4>
+      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form (ngSubmit)="createIdentificationType()">
+        <div class="form-group">
+          <label for="identityTypeName">Nombre del Tipo de ID</label>
+          <input type="text" id="identityTypeName" class="form-control" [(ngModel)]="newIdentificationTypeName" name="identityTypeName">
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="!newIdentificationTypeName.trim() || isSavingIdentificationType">
+            {{ isSavingIdentificationType ? 'Guardando...' : 'Crear' }}
+          </button>
+        </div>
+      </form>
+      <div *ngIf="identificationTypeError" class="inline-alert">
+        {{ identificationTypeError }}
+      </div>
+      <hr>
+      <ul class="list-group">
+        <li *ngFor="let type of identificationTypes; trackBy: trackByIdentificationTypeId" class="list-group-item d-flex justify-content-between align-items-center">
+          <div class="type-row">
+            <div class="type-name" *ngIf="editingIdentificationTypeId !== type.id">
+              {{ type.name }}
+            </div>
+            <input
+              *ngIf="editingIdentificationTypeId === type.id"
+              type="text"
+              class="form-control type-input"
+              [(ngModel)]="editingIdentificationTypeName"
+              name="editingIdentificationTypeName-{{ type.id }}"
+            >
+          </div>
+          <div class="type-actions">
+            <ng-container *ngIf="editingIdentificationTypeId !== type.id; else editActions">
+              <button type="button" class="btn btn-xs btn-outline" (click)="startEditIdentificationType(type)">Editar</button>
+              <button type="button" class="btn btn-xs btn-danger" (click)="deleteIdentificationType(type)">Eliminar</button>
+            </ng-container>
+            <ng-template #editActions>
+              <button
+                type="button"
+                class="btn btn-xs btn-primary"
+                [disabled]="!editingIdentificationTypeName.trim() || isSavingIdentificationType"
+                (click)="updateIdentificationType(type)"
+              >
+                Guardar
+              </button>
+              <button type="button" class="btn btn-xs btn-ghost" (click)="cancelEditIdentificationType()">Cancelar</button>
+            </ng-template>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </ng-template>
+</div>
+

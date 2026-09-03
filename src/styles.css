@@ -1,1 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 /* You can add global styles to this file, and also import other style files */
+:root {
+  --bg: #0f1115;
+  --bg-soft: #141821;
+  --surface: #1a202c;
+  --surface-2: #22293a;
+  --border: #2a3246;
+  --text: #e6e8ee;
+  --text-muted: #a6afc3;
+  --accent: #d1a450;
+  --accent-strong: #e1b35b;
+  --danger: #e06c75;
+  --shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Manrope', 'Space Grotesk', system-ui, sans-serif;
+  background: radial-gradient(1000px 520px at 10% -20%, #1a2234 0%, var(--bg) 60%);
+  color: var(--text);
+  margin: 0;
+}

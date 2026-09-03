@@ -1,0 +1,123 @@
+<main class="page" aria-labelledby="dashboard-title">
+	<header class="page-header">
+		<div>
+			<p class="eyebrow">Resumen del negocio</p>
+			<h1 id="dashboard-title">Panel financiero</h1>
+			<p class="subtitle">Controla los ingresos, las ganancias y los saldos de clientes.</p>
+		</div>
+
+		<div class="actions" aria-label="Controles del panel">
+			<label class="month-control">
+				<span>Mes del informe</span>
+				<select class="form-control" [value]="selectedMonth()" (change)="onMonthChange($event)">
+					@for (month of months; track month) {
+						<option [value]="month">{{ formatMonth(month) }}</option>
+					}
+				</select>
+			</label>
+			<button class="btn btn-primary refresh-button" type="button" (click)="loadDashboard(selectedMonth())" [disabled]="isLoading()">
+				<i class="fas fa-sync-alt" aria-hidden="true"></i>
+				Actualizar
+			</button>
+		</div>
+	</header>
+
+	@if (error()) {
+		<div class="inline-alert" role="alert">
+			<i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+			{{ error() }}
+		</div>
+	}
+
+	@if (isLoading()) {
+		<section class="loading-state" aria-live="polite">
+			<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+			<span>Cargando datos del panel...</span>
+		</section>
+	} @else {
+		<section class="metrics-grid" aria-label="Métricas financieras mensuales">
+			<article class="metric-card metric-revenue">
+				<div class="metric-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></div>
+				<div>
+					  <p class="metric-label">Ingresos totales</p>
+					<p class="metric-value">${{ metrics()?.totalRevenue ?? 0 | number: '1.2-2' }}</p>
+					  <p class="metric-helper">Ventas del mes</p>
+				</div>
+			</article>
+			<article class="metric-card metric-profit">
+				<div class="metric-icon"><i class="fas fa-coins" aria-hidden="true"></i></div>
+				<div>
+					  <p class="metric-label">Ganancia total</p>
+					<p class="metric-value">${{ metrics()?.totalProfit ?? 0 | number: '1.2-2' }}</p>
+					  <p class="metric-helper">Ventas y pagos</p>
+				</div>
+			</article>
+			<article class="metric-card metric-pending">
+				<div class="metric-icon"><i class="fas fa-hourglass-half" aria-hidden="true"></i></div>
+				<div>
+					  <p class="metric-label">Saldo pendiente</p>
+					<p class="metric-value">${{ metrics()?.pendingBalance ?? 0 | number: '1.2-2' }}</p>
+					  <p class="metric-helper">Pendiente del mes</p>
+				</div>
+			</article>
+		</section>
+
+		<section class="details-grid" aria-label="Detalles de cuentas por cobrar">
+			<article class="card receivables-card">
+				<div class="card-header">
+					<div>
+						<p class="eyebrow">Cuentas por cobrar</p>
+						<h2>Saldos pendientes</h2>
+					</div>
+					<i class="fas fa-wallet section-icon" aria-hidden="true"></i>
+				</div>
+				<div class="balance-list">
+					<div class="balance-row">
+						<span>Saldo histórico de clientes</span>
+						<strong>${{ totalPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+					</div>
+					<div class="balance-row">
+						<span>Saldo de {{ formatMonth(selectedMonth()) }}</span>
+						<strong>${{ monthlyPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+					</div>
+				</div>
+			</article>
+
+			<article class="card customer-card">
+				<div class="card-header">
+					<div>
+						<p class="eyebrow">Consulta de clientes</p>
+						<h2>Saldo por agente</h2>
+					</div>
+					<i class="fas fa-user-check section-icon" aria-hidden="true"></i>
+				</div>
+				<label for="agent-select">Selecciona un agente para consultar su saldo pendiente</label>
+				<div class="agent-picker">
+					  <select id="agent-select" class="form-control" [value]="selectedAgentId() ?? ''" (change)="onAgentChange($event)" [disabled]="!agents().length">
+						<option value="">Elige un agente</option>
+						@for (agent of agents(); track agent.id) {
+							<option [value]="agent.id">{{ agent.name }}</option>
+						}
+					</select>
+					@if (selectedAgentId()) {
+						<button class="btn btn-ghost clear-button" type="button" (click)="clearAgentSelection()" aria-label="Limpiar selección de agente" title="Limpiar selección de agente">
+							<i class="fas fa-times" aria-hidden="true"></i>
+						</button>
+					}
+				</div>
+				@if (isLoadingAgentBalance()) {
+					  <p class="lookup-state" aria-live="polite"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> Cargando saldo...</p>
+				} @else if (agentBalanceError()) {
+					<p class="field-error" role="alert">{{ agentBalanceError() }}</p>
+				} @else if (selectedAgentId() && agentPendingBalance() !== null) {
+					<div class="selected-balance">
+						<span>Importe pendiente</span>
+						<strong>${{ agentPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+					</div>
+				} @else {
+					  <p class="lookup-state">Selecciona un agente para consultar su saldo.</p>
+				}
+			</article>
+		</section>
+	}
+</main>

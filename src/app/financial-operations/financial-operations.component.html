@@ -1,0 +1,239 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Operaciones</p>
+      <h2>Operaciones Financieras</h2>
+      <p class="subtitle">Selecciona un agente para ver sus operaciones.</p>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" (click)="openOperationModal(operationModal)">Crear Operacion</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Agentes</h3>
+      <div class="pill">{{ agents.length }} activos</div>
+    </div>
+    <div class="agent-buttons">
+      <button
+        type="button"
+        class="btn btn-ghost"
+        *ngFor="let agent of agents; trackBy: trackByAgentId"
+        [class.active]="isAgentSelected(agent.id)"
+        (click)="selectAgent(agent)"
+      >
+        {{ agent.name }}
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Operaciones</h3>
+      <div class="pill">{{ operations.length }} items</div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Concepto</th>
+            <th>Total</th>
+            <th>Detalles</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let operation of operations; trackBy: trackByOperationId">
+            <td>{{ operation.id }}</td>
+            <td>{{ operation.date | date: 'short' }}</td>
+            <td>
+              <span
+                class="op-badge"
+                [class.op-in]="operation.operationType === 'SALE' || operation.operationType === 'PAYMENT'"
+                [class.op-out]="operation.operationType === 'PURCHASE'"
+              >
+                {{ operation.operationType === 'SALE' ? 'Venta' : (operation.operationType === 'PAYMENT' ? 'Pago' : 'Compra') }}
+              </span>
+            </td>
+            <td>{{ operation.concept }}</td>
+            <td>{{ operation.total | currency }}</td>
+            <td>
+              <button type="button" class="btn btn-xs btn-outline" (click)="openOperationDetail(operationDetailModal, operation)">
+                Ver detalles
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div *ngIf="!selectedAgentId" class="empty-state">
+      Selecciona un agente para ver sus operaciones.
+    </div>
+  </div>
+
+  <ng-template #operationModal>
+    <div class="modal-header">
+      <h4 class="modal-title pull-left">Crear Operacion</h4>
+      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form class="form-grid" (ngSubmit)="saveOperation()">
+        <div class="form-group form-full">
+          <label>Tipo de operacion</label>
+          <div class="mode-toggle">
+            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'amount'" (click)="operationMode = 'amount'; refreshProductsForOperation()">
+              Con monto
+            </button>
+            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'products'" (click)="operationMode = 'products'; refreshProductsForOperation()">
+              Con productos
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="operationType">Tipo</label>
+          <select
+            id="operationType"
+            class="form-control"
+            [(ngModel)]="operationForm.operationType"
+            (ngModelChange)="refreshProductsForOperation()"
+            name="operationType"
+          >
+            <option [ngValue]="'SALE'">Venta</option>
+            <option [ngValue]="'PURCHASE'">Compra</option>
+            <option *ngIf="operationMode === 'amount'" [ngValue]="'PAGO'">Pago</option>
+          </select>
+        </div>
+        <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
+          <label for="operationAgent">Agente</label>
+          <select
+            id="operationAgent"
+            class="form-control"
+            [(ngModel)]="operationAgentId"
+            (ngModelChange)="onOperationAgentChange()"
+            name="operationAgent"
+          >
+            <option [ngValue]="0" disabled>Selecciona un agente</option>
+            <option *ngFor="let agent of agents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
+          </select>
+          <span class="field-note">Se muestran productos del agente elegido para la venta.</span>
+        </div>
+        <div class="form-group">
+          <label for="operationConcept">Concepto</label>
+          <input
+            type="text"
+            id="operationConcept"
+            class="form-control"
+            [class.is-invalid]="isConceptInvalid()"
+            [(ngModel)]="operationForm.concept"
+            name="operationConcept"
+          >
+          <span *ngIf="isConceptInvalid()" class="field-error">Campo obligatorio.</span>
+        </div>
+        <div class="form-group" *ngIf="operationMode === 'amount'">
+          <label for="operationAmount">Monto</label>
+          <input
+            type="number"
+            id="operationAmount"
+            class="form-control"
+            [class.is-invalid]="isAmountInvalid()"
+            [(ngModel)]="operationForm.amount"
+            name="operationAmount"
+          >
+          <span *ngIf="isAmountInvalid()" class="field-error">Ingresa un monto valido.</span>
+        </div>
+        <div *ngIf="operationMode === 'products'" class="form-group">
+          <label for="operationProduct">Producto</label>
+          <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct">
+            <option [ngValue]="0" disabled>Selecciona un producto</option>
+            <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }}</option>
+          </select>
+        </div>
+        <div *ngIf="operationMode === 'products'" class="form-group">
+          <label for="operationQuantity">Cantidad</label>
+          <input type="number" id="operationQuantity" class="form-control" [(ngModel)]="selectedProductQuantity" name="operationQuantity">
+        </div>
+        <div class="form-actions">
+          <button
+            *ngIf="operationMode === 'products'"
+            type="button"
+            class="btn btn-outline"
+            (click)="addItem()"
+          >
+            Agregar Producto
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSavingOperation">
+            {{ isSavingOperation ? 'Guardando...' : 'Guardar' }}
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="modalRef?.hide()">Cancelar</button>
+        </div>
+      </form>
+      <div *ngIf="operationMode === 'products' && items.length" class="items-list">
+        <div class="items-title">Productos agregados</div>
+        <div class="items-row" *ngFor="let item of items; trackBy: trackByItemProductId">
+          <div>{{ getProductName(item.productId) }}</div>
+          <div class="items-qty">x{{ item.quantity }}</div>
+          <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
+        </div>
+      </div>
+      <div *ngIf="operationError" class="inline-alert">
+        {{ operationError }}
+      </div>
+    </div>
+  </ng-template>
+
+  <ng-template #operationDetailModal>
+    <div class="modal-header">
+      <h4 class="modal-title pull-left">Detalle de Operacion</h4>
+      <button type="button" class="close pull-right" aria-label="Close" (click)="closeModal()">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div class="modal-body detail-modal-body" *ngIf="selectedOperation as operation">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">ID</span>
+          <span class="detail-value">{{ operation.id }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha</span>
+          <span class="detail-value">{{ operation.date | date: 'medium' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Tipo</span>
+          <span class="detail-value">
+            {{ operation.operationType === 'SALE' ? 'Venta' : (operation.operationType === 'PAYMENT' ? 'Pago' : 'Compra') }}
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Concepto</span>
+          <span class="detail-value">{{ operation.concept }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total</span>
+          <span class="detail-value">{{ operation.total | currency }}</span>
+        </div>
+      </div>
+
+      <div class="detail-products">
+        <div class="detail-section-title">Productos</div>
+        <div *ngIf="operation.productResponses.length; else noProducts" class="detail-product-list">
+          <div class="detail-product-row" *ngFor="let product of operation.productResponses; trackBy: trackByOperationProductId">
+            <div class="detail-product-main">
+              <div class="detail-product-name">{{ product.name }}</div>
+              <div class="detail-product-meta">{{ product.unitType }}</div>
+            </div>
+            <div class="detail-product-qty">x{{ product.quantity }}</div>
+          </div>
+        </div>
+        <ng-template #noProducts>
+          <div class="empty-state empty-state-inline">No hay productos asociados a esta operacion.</div>
+        </ng-template>
+      </div>
+    </div>
+  </ng-template>
+</div>
