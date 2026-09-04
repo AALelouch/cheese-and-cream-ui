@@ -19,7 +19,7 @@ interface OperationItem {
 interface OperationForm {
   amount: number;
   concept: string;
-  operationType: 'SALE' | 'PURCHASE' | 'PAGO';
+  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT' | 'CLIENT_PAYMENT';
 }
 
 @Component({
@@ -49,6 +49,17 @@ export class FinancialOperationsComponent implements OnInit {
   selectedProductId = 0;
   selectedProductQuantity = 1;
   items: OperationItem[] = [];
+
+  readonly operationTypeLabels: Record<string, string> = {
+    SALE: 'Venta',
+    PAYMENT: 'Pago A Proveedor',
+    CLIENT_PAYMENT: 'Pago A Cliente',
+    PURCHASE: 'Compra'
+  };
+
+  getOperationLabel(type: string): string {
+    return this.operationTypeLabels[type] || 'Compra';
+  }
 
   constructor(
     private agentService: AgentService,
@@ -283,9 +294,6 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     if (this.operationMode === 'products') {
-      if (this.operationForm.operationType === 'PAGO') {
-        this.operationForm.operationType = 'SALE';
-      }
       if (!this.items.length) {
         this.operationError = 'Agrega al menos un producto.';
         return;
@@ -312,7 +320,7 @@ export class FinancialOperationsComponent implements OnInit {
       idAgent: requestAgentId,
       amount: this.operationForm.amount,
       concept: this.operationForm.concept.trim(),
-      operationType: this.operationForm.operationType === 'PAGO' ? 'PAYMENT' : this.operationForm.operationType,
+      operationType: this.operationForm.operationType,
       products: productsMap
     };
 

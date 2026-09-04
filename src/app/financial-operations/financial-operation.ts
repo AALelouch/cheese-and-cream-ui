@@ -3,7 +3,7 @@ export interface FinancialOperationRequest {
   idAgent: number;
   amount: number;
   concept: string;
-  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT';
+  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT' | 'CLIENT_PAYMENT';
 }
 
 export interface FinancialOperationResponse {
@@ -19,6 +19,6 @@ export interface FinancialOperationResponse {
   idAgent: number;
   concept: string;
   total: number;
-  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT';
+  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT' | 'CLIENT_PAYMENT';
   date: string;
 }

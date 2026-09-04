@@ -52,10 +52,10 @@
             <td>
               <span
                 class="op-badge"
-                [class.op-in]="operation.operationType === 'SALE' || operation.operationType === 'PAYMENT'"
+                [class.op-in]="operation.operationType === 'SALE' || operation.operationType === 'PAYMENT' || operation.operationType === 'CLIENT_PAYMENT'"
                 [class.op-out]="operation.operationType === 'PURCHASE'"
               >
-                {{ operation.operationType === 'SALE' ? 'Venta' : (operation.operationType === 'PAYMENT' ? 'Pago' : 'Compra') }}
+                {{getOperationLabel(operation.operationType)}}
               </span>
             </td>
             <td>{{ operation.concept }}</td>
@@ -105,7 +105,8 @@
           >
             <option [ngValue]="'SALE'">Venta</option>
             <option [ngValue]="'PURCHASE'">Compra</option>
-            <option *ngIf="operationMode === 'amount'" [ngValue]="'PAGO'">Pago</option>
+            <option *ngIf="operationMode === 'amount'" [ngValue]="'PAYMENT'">Pago a Proveedor</option>
+            <option *ngIf="operationMode === 'amount'" [ngValue]="'CLIENT_PAYMENT'">Pago a Cliente</option>
           </select>
         </div>
         <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
@@ -206,7 +207,7 @@
         <div class="detail-item">
           <span class="detail-label">Tipo</span>
           <span class="detail-value">
-            {{ operation.operationType === 'SALE' ? 'Venta' : (operation.operationType === 'PAYMENT' ? 'Pago' : 'Compra') }}
+            {{getOperationLabel(operation.operationType)}}
           </span>
         </div>
         <div class="detail-item">
