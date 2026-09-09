@@ -16,7 +16,7 @@
       <h3>Listado</h3>
       <div class="pill">{{ agents.length }} activos</div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" *ngIf="agents.length; else noAgents">
       <table class="table">
     <thead>
       <tr>
@@ -38,7 +38,7 @@
         <td>{{ agent.email }}</td>
         <td>{{ agent.phoneNumber }}</td>
         <td>{{ agent.address }}</td>
-        <td>{{ agent.balance | currency }}</td>
+        <td class="amount">{{ agent.balance | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
         <td>{{ getAgentIdentificationType(agent) }}</td>
         <td>{{ agent.identificationNumber }}</td>
         <td>
@@ -51,6 +51,9 @@
     </tbody>
       </table>
     </div>
+    <ng-template #noAgents>
+      <div class="empty-state" aria-live="polite"><strong>Aún no hay agentes registrados.</strong><span>Agrega el primer agente para empezar a organizar clientes y saldos.</span></div>
+    </ng-template>
   </div>
 
   <!-- Modal para crear agente -->
@@ -182,4 +185,3 @@
     </div>
   </ng-template>
 </div>
-

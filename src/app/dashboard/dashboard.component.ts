@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import { forkJoin } from 'rxjs';
 import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { DashboardMetrics } from './dashboard';
 import { DashboardService } from './dashboard.service';
+import { LucideChartNoAxesCombined, LucideCircleAlert, LucideClock3, LucideCoins, LucideLoaderCircle, LucideRefreshCw, LucideUserRoundCheck, LucideWalletCards, LucideX } from '@lucide/angular';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [CurrencyPipe, LucideChartNoAxesCombined, LucideCircleAlert, LucideClock3, LucideCoins, LucideLoaderCircle, LucideRefreshCw, LucideUserRoundCheck, LucideWalletCards, LucideX],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -199,8 +199,9 @@ export class FinancialOperationsComponent implements OnInit {
   loadOperations(agentId: number): void {
     this.financialOperationService.getByAgentId(agentId).subscribe({
       next: data => {
+        const list = Array.isArray(data) ? data : (data?.content ?? []);
         this.zone.run(() => {
-          this.operations = data;
+          this.operations = list;
           this.cdr.detectChanges();
         });
       },

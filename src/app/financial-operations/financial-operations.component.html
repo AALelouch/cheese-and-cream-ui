@@ -28,12 +28,12 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" aria-labelledby="operations-list-title">
     <div class="card-header">
-      <h3>Operaciones</h3>
+      <h3 id="operations-list-title">Operaciones</h3>
       <div class="pill">{{ operations.length }} items</div>
     </div>
-    <div class="table-wrap">
+    <div class="table-wrap" *ngIf="selectedAgentId && operations.length">
       <table class="table">
         <thead>
           <tr>
@@ -59,7 +59,7 @@
               </span>
             </td>
             <td>{{ operation.concept }}</td>
-            <td>{{ operation.total | currency }}</td>
+            <td class="amount">{{ operation.total | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
             <td>
               <button type="button" class="btn btn-xs btn-outline" (click)="openOperationDetail(operationDetailModal, operation)">
                 Ver detalles
@@ -69,8 +69,13 @@
         </tbody>
       </table>
     </div>
-    <div *ngIf="!selectedAgentId" class="empty-state">
-      Selecciona un agente para ver sus operaciones.
+    <div *ngIf="!selectedAgentId" class="empty-state" aria-live="polite">
+      <strong>Elige un agente para revisar sus movimientos.</strong>
+      <span>Sus ventas, compras y pagos aparecerán aquí.</span>
+    </div>
+    <div *ngIf="selectedAgentId && !operations.length" class="empty-state" aria-live="polite">
+      <strong>Este agente aún no tiene operaciones.</strong>
+      <span>Usa “Crear operación” para registrar el primer movimiento.</span>
     </div>
   </div>
 
@@ -216,7 +221,7 @@
         </div>
         <div class="detail-item">
           <span class="detail-label">Total</span>
-          <span class="detail-value">{{ operation.total | currency }}</span>
+          <span class="detail-value">{{ operation.total | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</span>
         </div>
       </div>
 

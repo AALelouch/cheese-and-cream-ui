@@ -11,8 +11,8 @@ export class FinancialOperationService {
 
   constructor(private http: HttpClient) {}
 
-  getByAgentId(agentId: number): Observable<FinancialOperationResponse[]> {
-    return this.http.get<FinancialOperationResponse[]>(`${this.apiUrl}/agent/${agentId}`);
+  getByAgentId(agentId: number): Observable<FinancialOperationResponse[] | { content?: FinancialOperationResponse[] }> {
+    return this.http.get<FinancialOperationResponse[] | { content?: FinancialOperationResponse[] }>(`${this.apiUrl}/agent/${agentId}`);
   }
 
   createOperation(request: FinancialOperationRequest): Observable<void> {

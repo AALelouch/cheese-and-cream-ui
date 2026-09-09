@@ -16,7 +16,7 @@
 				</select>
 			</label>
 			<button class="btn btn-primary refresh-button" type="button" (click)="loadDashboard(selectedMonth())" [disabled]="isLoading()">
-				<i class="fas fa-sync-alt" aria-hidden="true"></i>
+				<svg lucideRefreshCw size="17"></svg>
 				Actualizar
 			</button>
 		</div>
@@ -24,39 +24,39 @@
 
 	@if (error()) {
 		<div class="inline-alert" role="alert">
-			<i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+			<svg lucideCircleAlert size="18"></svg>
 			{{ error() }}
 		</div>
 	}
 
 	@if (isLoading()) {
 		<section class="loading-state" aria-live="polite">
-			<i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+			<svg lucideLoaderCircle size="20" class="spin"></svg>
 			<span>Cargando datos del panel...</span>
 		</section>
 	} @else {
 		<section class="metrics-grid" aria-label="Métricas financieras mensuales">
 			<article class="metric-card metric-revenue">
-				<div class="metric-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></div>
+				<div class="metric-icon"><svg lucideChartNoAxesCombined size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Ingresos totales</p>
-					<p class="metric-value">${{ metrics()?.totalRevenue ?? 0 | number: '1.2-2' }}</p>
+					<p class="metric-value">{{ metrics()?.totalRevenue ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
 					  <p class="metric-helper">Ventas del mes</p>
 				</div>
 			</article>
 			<article class="metric-card metric-profit">
-				<div class="metric-icon"><i class="fas fa-coins" aria-hidden="true"></i></div>
+				<div class="metric-icon"><svg lucideCoins size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Ganancia total</p>
-					<p class="metric-value">${{ metrics()?.totalProfit ?? 0 | number: '1.2-2' }}</p>
+					<p class="metric-value">{{ metrics()?.totalProfit ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
 					  <p class="metric-helper">Ventas y pagos</p>
 				</div>
 			</article>
 			<article class="metric-card metric-pending">
-				<div class="metric-icon"><i class="fas fa-hourglass-half" aria-hidden="true"></i></div>
+				<div class="metric-icon"><svg lucideClock3 size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Saldo pendiente</p>
-					<p class="metric-value">${{ metrics()?.pendingBalance ?? 0 | number: '1.2-2' }}</p>
+					<p class="metric-value">{{ metrics()?.pendingBalance ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
 					  <p class="metric-helper">Pendiente del mes</p>
 				</div>
 			</article>
@@ -69,16 +69,16 @@
 						<p class="eyebrow">Cuentas por cobrar</p>
 						<h2>Saldos pendientes</h2>
 					</div>
-					<i class="fas fa-wallet section-icon" aria-hidden="true"></i>
+					<svg lucideWalletCards class="section-icon" size="22"></svg>
 				</div>
 				<div class="balance-list">
 					<div class="balance-row">
 						<span>Saldo histórico de clientes</span>
-						<strong>${{ totalPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+						<strong>{{ totalPendingBalance() ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
 					</div>
 					<div class="balance-row">
 						<span>Saldo de {{ formatMonth(selectedMonth()) }}</span>
-						<strong>${{ monthlyPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+						<strong>{{ monthlyPendingBalance() ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
 					</div>
 				</div>
 			</article>
@@ -89,7 +89,7 @@
 						<p class="eyebrow">Consulta de clientes</p>
 						<h2>Saldo por agente</h2>
 					</div>
-					<i class="fas fa-user-check section-icon" aria-hidden="true"></i>
+					<svg lucideUserRoundCheck class="section-icon" size="22"></svg>
 				</div>
 				<label for="agent-select">Selecciona un agente para consultar su saldo pendiente</label>
 				<div class="agent-picker">
@@ -101,18 +101,18 @@
 					</select>
 					@if (selectedAgentId()) {
 						<button class="btn btn-ghost clear-button" type="button" (click)="clearAgentSelection()" aria-label="Limpiar selección de agente" title="Limpiar selección de agente">
-							<i class="fas fa-times" aria-hidden="true"></i>
+							<svg lucideX size="17"></svg>
 						</button>
 					}
 				</div>
 				@if (isLoadingAgentBalance()) {
-					  <p class="lookup-state" aria-live="polite"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> Cargando saldo...</p>
+					  <p class="lookup-state" aria-live="polite"><svg lucideLoaderCircle size="16" class="spin"></svg> Cargando saldo...</p>
 				} @else if (agentBalanceError()) {
 					<p class="field-error" role="alert">{{ agentBalanceError() }}</p>
 				} @else if (selectedAgentId() && agentPendingBalance() !== null) {
 					<div class="selected-balance">
 						<span>Importe pendiente</span>
-						<strong>${{ agentPendingBalance() ?? 0 | number: '1.2-2' }}</strong>
+					<strong>{{ agentPendingBalance() ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
 					</div>
 				} @else {
 					  <p class="lookup-state">Selecciona un agente para consultar su saldo.</p>

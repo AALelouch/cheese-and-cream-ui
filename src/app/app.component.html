@@ -1,10 +1,25 @@
-<div class="sidebar">
-  <a routerLink="/dashboard" routerLinkActive="active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-  <a routerLink="/agents" routerLinkActive="active"><i class="fas fa-users"></i> Agentes</a>
-  <a routerLink="/financial-operations" routerLinkActive="active"><i class="fas fa-coins"></i> Operaciones</a>
-  <a routerLink="/products" routerLinkActive="active"><i class="fas fa-cheese"></i> Productos</a>
-</div>
+<header class="app-bar">
+  <a class="brand" routerLink="/dashboard" aria-label="Cheese & Cream, ir al panel">
+    <img src="assets/img/logo.png" alt="" class="brand-mark">
+    <span><strong>Cheese &amp; Cream</strong><small>Libro de bodega</small></span>
+  </a>
+  <button class="nav-toggle" type="button" (click)="toggleNavigation()" [attr.aria-expanded]="isNavigationOpen" aria-controls="primary-navigation">
+    @if (isNavigationOpen) { <svg lucideX size="21"></svg> } @else { <svg lucideMenu size="21"></svg> }
+    <span class="visually-hidden">{{ isNavigationOpen ? 'Cerrar menú' : 'Abrir menú' }}</span>
+  </button>
+</header>
 
-<div class="content">
+<nav id="primary-navigation" class="sidebar" [class.is-open]="isNavigationOpen" aria-label="Navegación principal">
+  <a class="sidebar-brand" routerLink="/dashboard" (click)="closeNavigation()">
+    <img src="assets/img/logo.png" alt="" class="brand-mark">
+    <span><strong>Cheese &amp; Cream</strong><small>Libro de bodega</small></span>
+  </a>
+  <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNavigation()"><svg lucideLayoutDashboard size="19"></svg><span>Panel financiero</span></a>
+  <a routerLink="/agents" routerLinkActive="active" (click)="closeNavigation()"><svg lucideUsersRound size="19"></svg><span>Agentes</span></a>
+  <a routerLink="/financial-operations" routerLinkActive="active" (click)="closeNavigation()"><svg lucideReceiptText size="19"></svg><span>Operaciones</span></a>
+  <a routerLink="/products" routerLinkActive="active" (click)="closeNavigation()"><svg lucidePackage size="19"></svg><span>Productos</span></a>
+</nav>
+
+<main class="content">
   <router-outlet></router-outlet>
-</div>
+</main>

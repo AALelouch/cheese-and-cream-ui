@@ -1,22 +1,21 @@
+import { provideHttpClient } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BsModalService } from 'ngx-bootstrap/modal';
+import { AgentsComponent } from './agents.component';
 
-import { Agents } from './agents';
-
-describe('Agents', () => {
-  let component: Agents;
-  let fixture: ComponentFixture<Agents>;
+describe('AgentsComponent', () => {
+  let component: AgentsComponent;
+  let fixture: ComponentFixture<AgentsComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [Agents],
+      imports: [AgentsComponent],
+      providers: [provideHttpClient(), BsModalService]
     }).compileComponents();
 
-    fixture = TestBed.createComponent(Agents);
+    fixture = TestBed.createComponent(AgentsComponent);
     component = fixture.componentInstance;
-    await fixture.whenStable();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
+  it('should create', () => expect(component).toBeTruthy());
 });
