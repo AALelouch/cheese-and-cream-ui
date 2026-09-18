@@ -1,7 +1,6 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { AgentResponse } from '../agents/agent';
@@ -9,12 +8,14 @@ import { AgentService } from '../agents/agent.service';
 import { CategoryResponse } from './category';
 import { CategoryService } from './category.service';
 import { ProductRequest, ProductResponse } from './product';
-import { ProductService } from './product.service';
+import { ProductService, PRODUCT_DEFAULT_SORT } from './product.service';
+import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
+import { removeById, replaceById } from '../shared/collection';
 
 @Component({
   selector: 'app-products',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './products.component.html',
   styleUrls: ['./products.component.css'],
 })
@@ -42,6 +43,8 @@ export class ProductsComponent implements OnInit {
     agendId: 0
   };
   productFormSubmitted = false;
+  pagination = createPaginationState();
+  private productsRequestId = 0;
 
   constructor(
     private productService: ProductService,
@@ -52,21 +55,31 @@ export class ProductsComponent implements OnInit {
     private zone: NgZone
   ) {}
 
+  get page(): number { return this.pagination.page; }
+  get pageSize(): number { return this.pagination.pageSize; }
+  get totalElements(): number { return this.pagination.totalElements; }
+  get totalPages(): number { return this.pagination.totalPages; }
+  get first(): boolean { return this.pagination.first; }
+  get last(): boolean { return this.pagination.last; }
+
   ngOnInit(): void {
     this.loadAgents();
     this.loadCategories();
   }
 
-  loadProductsByAgent(agentId: number): void {
-    this.productService.getProductsByAgentId(agentId).subscribe({
+  loadProductsByAgent(agentId: number, page = this.page): void {
+    const requestId = ++this.productsRequestId;
+    this.productService.getProductsByAgentId(agentId, { page, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT }).subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
+        if (requestId !== this.productsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
-          this.products = list;
+          this.products = data.content;
+          updatePaginationState(this.pagination, data);
           this.cdr.detectChanges();
         });
       },
       error: () => {
+        if (requestId !== this.productsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
           this.productError = 'No se pudieron cargar los productos.';
           this.cdr.detectChanges();
@@ -77,21 +90,31 @@ export class ProductsComponent implements OnInit {
 
   selectAgent(agent: AgentResponse): void {
     this.selectedAgentId = agent.id;
-    this.loadProductsByAgent(agent.id);
+    this.loadProductsByAgent(agent.id, 0);
   }
 
   clearAgentFilter(): void {
+    this.productsRequestId++;
     this.selectedAgentId = null;
     this.products = [];
+    this.pagination = createPaginationState(this.pageSize);
     this.cdr.detectChanges();
+  }
+
+  changePage(page: number): void {
+    if (this.selectedAgentId && page >= 0 && page < this.totalPages && page !== this.page) this.loadProductsByAgent(this.selectedAgentId, page);
+  }
+
+  changePageSize(size: string): void {
+    this.pagination.pageSize = Number(size) || DEFAULT_PAGE_SIZE;
+    if (this.selectedAgentId) this.loadProductsByAgent(this.selectedAgentId, 0);
   }
 
   loadAgents(): void {
     this.agentService.getAllAgents().subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
         this.zone.run(() => {
-          this.agents = list;
+          this.agents = data.content;
           this.cdr.detectChanges();
         });
       },
@@ -142,8 +165,8 @@ export class ProductsComponent implements OnInit {
       price: product.price ?? 0,
       cost: product.cost ?? 0,
       unitType: product.unitType ?? '',
-      categoryId: 0,
-      agendId: this.agents.find(agent => agent.name === product.agentName)?.id ?? 0
+      categoryId: this.categories.find(category => category.name === product.categoryName)?.id ?? 0,
+      agendId: this.selectedAgentId ?? this.agents.find(agent => agent.name === product.agentName)?.id ?? 0
     };
     this.productError = '';
     this.productFormSubmitted = false;
@@ -228,7 +251,7 @@ export class ProductsComponent implements OnInit {
         this.zone.run(() => {
           const index = this.categories.findIndex(item => item.id === category.id);
           if (index >= 0) {
-            this.categories[index] = { ...this.categories[index], name: trimmedName };
+            this.categories = replaceById(this.categories, { ...category, name: trimmedName });
           } else {
             this.loadCategories();
           }
@@ -266,7 +289,7 @@ export class ProductsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
-          this.categories = this.categories.filter(item => item.id !== category.id);
+          this.categories = removeById(this.categories, category.id);
           if (this.editingCategoryId === category.id) {
             this.cancelEditCategory();
           }
@@ -321,7 +344,7 @@ export class ProductsComponent implements OnInit {
           const agentId = this.productForm.agendId || this.selectedAgentId;
           if (agentId) {
             this.selectedAgentId = agentId;
-            this.loadProductsByAgent(agentId);
+            this.loadProductsByAgent(agentId, 0);
           } else {
             this.products = [];
           }
@@ -351,6 +374,7 @@ export class ProductsComponent implements OnInit {
       return;
     }
 
+    const pageAfterDelete = this.products.length === 1 && this.page > 0 ? this.page - 1 : this.page;
     this.isSavingProduct = true;
     this.productError = '';
 
@@ -362,9 +386,9 @@ export class ProductsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
-          this.products = this.products.filter(item => item.id !== product.id);
+          this.products = removeById(this.products, product.id);
           if (this.selectedAgentId) {
-            this.loadProductsByAgent(this.selectedAgentId);
+            this.loadProductsByAgent(this.selectedAgentId, pageAfterDelete);
           }
           this.cdr.detectChanges();
         });

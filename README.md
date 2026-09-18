@@ -46,11 +46,18 @@ La navegación principal se define en `src/app/app-routing.module.ts`. Los servi
 
 ## Integración con la API
 
-Por defecto, el frontend espera el backend en:
+El host y las rutas de la API se centralizan en `src/environments/`. El build de
+desarrollo usa:
 
 ```text
 http://localhost:8080
 ```
+
+El build de producción usa rutas relativas (`/api/...`) para consumir el backend
+desde el mismo origen. Si el backend de producción está en otro dominio, cambia
+únicamente `apiBaseUrl` en `src/environments/environment.ts`. Angular sustituye
+automáticamente ese archivo por `environment.development.ts` al ejecutar
+`npm start`.
 
 Rutas principales utilizadas:
 
@@ -61,6 +68,9 @@ Rutas principales utilizadas:
 | Categorías | `/api/categories` |
 | Operaciones | `/api/financial-operations` |
 | Dashboard | `/api/dashboard` |
+
+Las rutas compartidas, la clave de almacenamiento de autenticación y el esquema
+del encabezado se definen una sola vez en `environment.config.ts`.
 
 La documentación específica del dashboard está disponible en `.ai/guides/DashBoard/`, incluyendo contratos, respuestas y ejemplos de integración.
 

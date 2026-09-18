@@ -14,7 +14,7 @@
   <div class="card">
     <div class="card-header">
       <h3>Listado</h3>
-      <div class="pill">{{ agents.length }} activos</div>
+      <div class="pill">{{ totalElements }} activos</div>
     </div>
     <div class="table-wrap" *ngIf="agents.length; else noAgents">
       <table class="table">
@@ -54,6 +54,11 @@
     <ng-template #noAgents>
       <div class="empty-state" aria-live="polite"><strong>Aún no hay agentes registrados.</strong><span>Agrega el primer agente para empezar a organizar clientes y saldos.</span></div>
     </ng-template>
+    <div class="pagination-bar" *ngIf="totalElements">
+      <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
+      <label>Por página <select class="form-control pagination-size" [value]="pageSize" (change)="changePageSize($any($event.target).value)"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></label>
+      <div class="row-actions"><button class="btn btn-xs btn-ghost" [disabled]="first" (click)="changePage(page - 1)">Anterior</button><button class="btn btn-xs btn-ghost" [disabled]="last" (click)="changePage(page + 1)">Siguiente</button></div>
+    </div>
   </div>
 
   <!-- Modal para crear agente -->

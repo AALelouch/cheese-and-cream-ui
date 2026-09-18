@@ -3,16 +3,17 @@ import { AgentRequest, AgentResponse } from './agent';
 import { CommonModule } from '@angular/common';
 import { IdentificationTypeService } from './identification-type.service';
 import { IdentificationTypeRequest, IdentificationTypeResponse } from './identification-type';
-import { HttpClientModule } from '@angular/common/http';
 import { BsModalService, BsModalRef } from 'ngx-bootstrap/modal';
 import { FormsModule } from '@angular/forms';
 import { finalize, timeout } from 'rxjs';
-import { AgentService } from './agent.service';
+import { AgentService, AGENT_DEFAULT_SORT } from './agent.service';
+import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
+import { removeById, replaceById } from '../shared/collection';
 
 @Component({
   selector: 'app-agents',
   standalone: true,
-  imports: [CommonModule, HttpClientModule, FormsModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './agents.component.html',
   styleUrls: ['./agents.component.css'],
   providers: [IdentificationTypeService]
@@ -39,6 +40,8 @@ export class AgentsComponent implements OnInit {
   };
   agentFormSubmitted = false;
   editingAgentId: number | null = null;
+  pagination = createPaginationState();
+  private agentsRequestId = 0;
 
   constructor(
     private identificationTypeService: IdentificationTypeService,
@@ -48,27 +51,46 @@ export class AgentsComponent implements OnInit {
     private zone: NgZone
   ) { }
 
+  get page(): number { return this.pagination.page; }
+  get pageSize(): number { return this.pagination.pageSize; }
+  get totalElements(): number { return this.pagination.totalElements; }
+  get totalPages(): number { return this.pagination.totalPages; }
+  get first(): boolean { return this.pagination.first; }
+  get last(): boolean { return this.pagination.last; }
+
   ngOnInit(): void {
     this.loadAgents();
     this.loadIdentificationTypes();
   }
 
-  loadAgents(): void {
-    this.agentService.getAllAgents().subscribe({
+  loadAgents(page = this.page): void {
+    const requestId = ++this.agentsRequestId;
+    this.agentService.getAllAgents({ page, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
+        if (requestId !== this.agentsRequestId) return;
         this.zone.run(() => {
-          this.agents = list;
+          this.agents = data.content;
+          updatePaginationState(this.pagination, data);
           this.cdr.detectChanges();
         });
       },
       error: () => {
+        if (requestId !== this.agentsRequestId) return;
         this.zone.run(() => {
           this.agentError = 'No se pudieron cargar los agentes.';
           this.cdr.detectChanges();
         });
       }
     });
+  }
+
+  changePage(page: number): void {
+    if (page >= 0 && page < this.totalPages && page !== this.page) this.loadAgents(page);
+  }
+
+  changePageSize(size: string): void {
+    this.pagination.pageSize = Number(size) || DEFAULT_PAGE_SIZE;
+    this.loadAgents(0);
   }
 
   loadIdentificationTypes(): void {
@@ -180,7 +202,7 @@ export class AgentsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
-          this.loadAgents();
+          this.loadAgents(this.page);
           this.resetAgentForm();
           this.modalRef?.hide();
           this.cdr.detectChanges();
@@ -207,6 +229,7 @@ export class AgentsComponent implements OnInit {
       return;
     }
 
+    const pageAfterDelete = this.agents.length === 1 && this.page > 0 ? this.page - 1 : this.page;
     this.isSavingAgent = true;
     this.agentError = '';
 
@@ -219,7 +242,7 @@ export class AgentsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
-          this.loadAgents();
+          this.loadAgents(pageAfterDelete);
           this.cdr.detectChanges();
         });
       },
@@ -329,7 +352,7 @@ export class AgentsComponent implements OnInit {
         this.zone.run(() => {
           const index = this.identificationTypes.findIndex(item => item.id === type.id);
           if (index >= 0) {
-            this.identificationTypes[index] = { ...this.identificationTypes[index], name: trimmedName };
+            this.identificationTypes = replaceById(this.identificationTypes, { ...type, name: trimmedName });
           } else {
             this.loadIdentificationTypes();
           }
@@ -366,7 +389,7 @@ export class AgentsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
-          this.identificationTypes = this.identificationTypes.filter(item => item.id !== type.id);
+          this.identificationTypes = removeById(this.identificationTypes, type.id);
           if (this.editingIdentificationTypeId === type.id) {
             this.cancelEditIdentificationType();
           }

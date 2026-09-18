@@ -2,17 +2,21 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AgentRequest, AgentResponse } from './agent';
+import { DEFAULT_PAGE_SIZE, PageRequest, PageResponse, toPageParams } from '../shared/pagination';
+import { environment } from '../../environments/environment';
+
+export const AGENT_DEFAULT_SORT = ['name,asc', 'id,asc'];
 
 @Injectable({
   providedIn: 'root'
 })
 export class AgentService {
-  private apiUrl = 'http://localhost:8080/api/agents';
+  private readonly apiUrl = environment.api.endpoints.agents;
 
-  constructor(private http: HttpClient) {}
+  constructor(private readonly http: HttpClient) {}
 
-  getAllAgents(): Observable<AgentResponse[] | { content?: AgentResponse[] }> {
-    return this.http.get<AgentResponse[] | { content?: AgentResponse[] }>(this.apiUrl);
+  getAllAgents(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.get<PageResponse<AgentResponse>>(this.apiUrl, { params: toPageParams(request) });
   }
 
   createAgent(request: AgentRequest): Observable<void> {

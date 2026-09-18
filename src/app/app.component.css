@@ -50,3 +50,5 @@
   .sidebar.is-open { transform: translateY(0); }
   .content { margin-left: 0; padding: 24px 16px 40px; }
 }
+.sidebar-logout { width: calc(100% - 24px); margin: auto 12px 12px; padding: 10px 12px; color: var(--danger); background: transparent; border: 1px solid rgb(224 138 128 / .5); border-radius: var(--radius-sm); font: inherit; font-size: .84rem; font-weight: 700; text-align: left; }
+.sidebar-logout:hover { background: var(--danger-wash); }

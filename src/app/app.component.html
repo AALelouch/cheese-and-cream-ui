@@ -1,10 +1,17 @@
+@if (isLoginPage) {
+  <router-outlet></router-outlet>
+} @else {
 <header class="app-bar">
   <a class="brand" routerLink="/dashboard" aria-label="Cheese & Cream, ir al panel">
     <img src="assets/img/logo.png" alt="" class="brand-mark">
     <span><strong>Cheese &amp; Cream</strong><small>Libro de bodega</small></span>
   </a>
   <button class="nav-toggle" type="button" (click)="toggleNavigation()" [attr.aria-expanded]="isNavigationOpen" aria-controls="primary-navigation">
-    @if (isNavigationOpen) { <svg lucideX size="21"></svg> } @else { <svg lucideMenu size="21"></svg> }
+    @if (isNavigationOpen) {
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    } @else {
+      <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    }
     <span class="visually-hidden">{{ isNavigationOpen ? 'Cerrar menú' : 'Abrir menú' }}</span>
   </button>
 </header>
@@ -14,12 +21,14 @@
     <img src="assets/img/logo.png" alt="" class="brand-mark">
     <span><strong>Cheese &amp; Cream</strong><small>Libro de bodega</small></span>
   </a>
-  <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNavigation()"><svg lucideLayoutDashboard size="19"></svg><span>Panel financiero</span></a>
-  <a routerLink="/agents" routerLinkActive="active" (click)="closeNavigation()"><svg lucideUsersRound size="19"></svg><span>Agentes</span></a>
-  <a routerLink="/financial-operations" routerLinkActive="active" (click)="closeNavigation()"><svg lucideReceiptText size="19"></svg><span>Operaciones</span></a>
-  <a routerLink="/products" routerLinkActive="active" (click)="closeNavigation()"><svg lucidePackage size="19"></svg><span>Productos</span></a>
+  <a routerLink="/dashboard" routerLinkActive="active" (click)="closeNavigation()"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg><span>Panel financiero</span></a>
+  <a routerLink="/agents" routerLinkActive="active" (click)="closeNavigation()"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg><span>Agentes</span></a>
+  <a routerLink="/financial-operations" routerLinkActive="active" (click)="closeNavigation()"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2Z"/><path d="M14 8H8M16 12H8M13 16H8"/></svg><span>Operaciones</span></a>
+  <a routerLink="/products" routerLinkActive="active" (click)="closeNavigation()"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg><span>Productos</span></a>
+  <button type="button" class="sidebar-logout" (click)="logout()">Cerrar sesión</button>
 </nav>
 
 <main class="content">
   <router-outlet></router-outlet>
 </main>
+}

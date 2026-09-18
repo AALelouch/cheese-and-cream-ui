@@ -31,7 +31,7 @@
   <div class="card" aria-labelledby="operations-list-title">
     <div class="card-header">
       <h3 id="operations-list-title">Operaciones</h3>
-      <div class="pill">{{ operations.length }} items</div>
+      <div class="pill">{{ totalElements }} items</div>
     </div>
     <div class="table-wrap" *ngIf="selectedAgentId && operations.length">
       <table class="table">
@@ -77,6 +77,11 @@
       <strong>Este agente aún no tiene operaciones.</strong>
       <span>Usa “Crear operación” para registrar el primer movimiento.</span>
     </div>
+    <div class="pagination-bar" *ngIf="selectedAgentId && totalElements">
+      <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
+      <label>Por página <select class="form-control pagination-size" [value]="pageSize" (change)="changePageSize($any($event.target).value)"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></label>
+      <div class="row-actions"><button class="btn btn-xs btn-ghost" [disabled]="first" (click)="changePage(page - 1)">Anterior</button><button class="btn btn-xs btn-ghost" [disabled]="last" (click)="changePage(page + 1)">Siguiente</button></div>
+    </div>
   </div>
 
   <ng-template #operationModal>
@@ -91,10 +96,10 @@
         <div class="form-group form-full">
           <label>Tipo de operacion</label>
           <div class="mode-toggle">
-            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'amount'" (click)="operationMode = 'amount'; refreshProductsForOperation()">
+            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'amount'" (click)="onOperationModeChange('amount')">
               Con monto
             </button>
-            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'products'" (click)="operationMode = 'products'; refreshProductsForOperation()">
+            <button type="button" class="btn btn-ghost" [class.active]="operationMode === 'products'" (click)="onOperationModeChange('products')">
               Con productos
             </button>
           </div>
@@ -105,7 +110,7 @@
             id="operationType"
             class="form-control"
             [(ngModel)]="operationForm.operationType"
-            (ngModelChange)="refreshProductsForOperation()"
+            (ngModelChange)="onOperationTypeChange()"
             name="operationType"
           >
             <option [ngValue]="'SALE'">Venta</option>
@@ -115,18 +120,20 @@
           </select>
         </div>
         <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
-          <label for="operationAgent">Agente</label>
+          <label for="operationAgent">Agente de los productos</label>
           <select
             id="operationAgent"
             class="form-control"
+            [class.is-invalid]="isOperationAgentInvalid()"
             [(ngModel)]="operationAgentId"
             (ngModelChange)="onOperationAgentChange()"
             name="operationAgent"
           >
-            <option [ngValue]="0" disabled>Selecciona un agente</option>
-            <option *ngFor="let agent of agents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
+            <option [ngValue]="null" disabled>Selecciona un agente</option>
+            <option *ngFor="let agent of agents; trackBy: trackByAgentId" [ngValue]="agent.id" [disabled]="agent.id === selectedAgentId">{{ agent.name }}</option>
           </select>
           <span class="field-note">Se muestran productos del agente elegido para la venta.</span>
+          <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un agente diferente al agente principal.</span>
         </div>
         <div class="form-group">
           <label for="operationConcept">Concepto</label>
@@ -154,10 +161,13 @@
         </div>
         <div *ngIf="operationMode === 'products'" class="form-group">
           <label for="operationProduct">Producto</label>
-          <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct">
+          <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct" [disabled]="!isInventoryAgentValid() || isCurrentInventoryLoading() || hasCurrentInventoryLoadError() || !getCurrentProductOptions().length">
             <option [ngValue]="0" disabled>Selecciona un producto</option>
             <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }}</option>
           </select>
+          <span *ngIf="isCurrentInventoryLoading()" class="field-note" aria-live="polite">Cargando productos…</span>
+          <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este agente no tiene productos disponibles.</span>
+          <span *ngIf="hasCurrentInventoryLoadError()" class="field-error" role="alert">No se pudieron cargar los productos. <button type="button" class="btn btn-xs btn-outline" (click)="retryProductsLoad()">Reintentar</button></span>
         </div>
         <div *ngIf="operationMode === 'products'" class="form-group">
           <label for="operationQuantity">Cantidad</label>
@@ -169,6 +179,7 @@
             type="button"
             class="btn btn-outline"
             (click)="addItem()"
+            [disabled]="!canAddItem()"
           >
             Agregar Producto
           </button>
@@ -186,7 +197,7 @@
           <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
         </div>
       </div>
-      <div *ngIf="operationError" class="inline-alert">
+      <div *ngIf="operationError" class="inline-alert" role="alert">
         {{ operationError }}
       </div>
     </div>

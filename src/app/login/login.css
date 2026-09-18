@@ -1,0 +1,7 @@
+.login-page { display: grid; min-height: 100vh; place-items: center; padding: 24px; }
+.login-card { width: min(100%, 420px); padding: 34px; background: var(--ink-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.login-card h1 { margin: 0; color: var(--cream); font-family: 'Space Grotesk', sans-serif; }
+.login-card > p:not(.eyebrow) { margin: 8px 0 26px; color: var(--text-muted); }
+.login-card form { display: grid; gap: 18px; }
+.login-logo { display: block; width: 66px; height: 66px; margin-bottom: 22px; object-fit: contain; }
+.login-submit { width: 100%; margin-top: 6px; }

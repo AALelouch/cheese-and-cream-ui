@@ -34,6 +34,22 @@
   box-sizing: border-box;
 }
 
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.d-flex { display: flex !important; }
+.justify-content-between { justify-content: space-between !important; }
+.align-items-center { align-items: center !important; }
+
 html, body {
   min-height: 100%;
 }
@@ -85,7 +101,7 @@ label { color: var(--text-muted); font-size: .84rem; font-weight: 700; }
 .field-note { color: var(--text-muted); font-size: .77rem; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.table { width: 100%; margin: 0; --bs-table-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--line); }
+.table { width: 100%; margin: 0; border-collapse: collapse; --bs-table-bg: transparent; --bs-table-color: var(--text); --bs-table-border-color: var(--line); }
 .table thead { background: #0c141d; }
 .table th { color: var(--text-muted); font-size: .71rem; font-weight: 800; letter-spacing: .05em; white-space: nowrap; }
 .table th, .table td { padding: 13px 14px; vertical-align: middle; border-bottom-color: var(--line); }
@@ -95,6 +111,9 @@ label { color: var(--text-muted); font-size: .84rem; font-weight: 700; }
 
 .empty-state { display: grid; place-items: center; gap: 5px; min-height: 132px; padding: 20px; color: var(--text-muted); text-align: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); }
 .empty-state strong { color: var(--cream); }
+.pagination-bar { display: flex; align-items: center; justify-content: flex-end; gap: 13px; flex-wrap: wrap; padding-top: 16px; color: var(--text-muted); font-size: .82rem; }
+.pagination-bar label { display: flex; align-items: center; gap: 8px; }
+.pagination-size { min-height: 36px; width: auto; padding: 5px 28px 5px 8px; }
 .inline-alert { margin-top: 14px; padding: 12px 14px; color: var(--danger); background: var(--danger-wash); border: 1px solid rgb(224 138 128 / .42); border-radius: var(--radius-sm); font-size: .88rem; }
 .modal-header, .modal-body { color: var(--text); background: var(--ink-raised); border-color: var(--line); }
 .modal-content { overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 22px 44px rgb(0 0 0 / .42); }

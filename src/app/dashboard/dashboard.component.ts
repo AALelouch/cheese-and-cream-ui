@@ -31,6 +31,8 @@ export class DashboardComponent implements OnInit {
   readonly isLoadingAgentBalance = signal(false);
   readonly error = signal('');
   readonly agentBalanceError = signal('');
+  private dashboardRequestId = 0;
+  private agentBalanceRequestId = 0;
 
   ngOnInit(): void {
     this.loadAgents();
@@ -38,6 +40,7 @@ export class DashboardComponent implements OnInit {
   }
 
   loadDashboard(month: number): void {
+    const requestId = ++this.dashboardRequestId;
     this.selectedMonth.set(month);
     this.isLoading.set(true);
     this.error.set('');
@@ -48,12 +51,14 @@ export class DashboardComponent implements OnInit {
       monthlyPendingBalance: this.dashboardService.getMonthlyPendingBalance(month)
     }).subscribe({
       next: data => {
+        if (requestId !== this.dashboardRequestId) return;
         this.metrics.set(data.metrics);
         this.totalPendingBalance.set(data.totalPendingBalance);
         this.monthlyPendingBalance.set(data.monthlyPendingBalance);
         this.isLoading.set(false);
       },
       error: () => {
+        if (requestId !== this.dashboardRequestId) return;
         this.error.set('No se pudieron cargar los datos del panel. Comprueba la conexión con la API e inténtalo de nuevo.');
         this.isLoading.set(false);
       }
@@ -69,6 +74,7 @@ export class DashboardComponent implements OnInit {
   }
 
   selectAgent(agentId: number): void {
+    const requestId = ++this.agentBalanceRequestId;
     this.selectedAgentId.set(agentId);
     this.agentPendingBalance.set(null);
     this.agentBalanceError.set('');
@@ -76,10 +82,12 @@ export class DashboardComponent implements OnInit {
 
     this.dashboardService.getAgentPendingBalance(agentId).subscribe({
       next: balance => {
+        if (requestId !== this.agentBalanceRequestId || this.selectedAgentId() !== agentId) return;
         this.agentPendingBalance.set(balance);
         this.isLoadingAgentBalance.set(false);
       },
       error: () => {
+        if (requestId !== this.agentBalanceRequestId || this.selectedAgentId() !== agentId) return;
         this.agentBalanceError.set('No se pudo cargar el saldo del cliente seleccionado.');
         this.isLoadingAgentBalance.set(false);
       }
@@ -87,6 +95,7 @@ export class DashboardComponent implements OnInit {
   }
 
   clearAgentSelection(): void {
+    this.agentBalanceRequestId++;
     this.selectedAgentId.set(null);
     this.agentPendingBalance.set(null);
     this.agentBalanceError.set('');

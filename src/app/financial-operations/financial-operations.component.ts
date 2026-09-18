@@ -1,15 +1,15 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
-import { catchError, finalize, forkJoin, of } from 'rxjs';
+import { finalize } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { ProductResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
-import { FinancialOperationRequest, FinancialOperationResponse } from './financial-operation';
-import { FinancialOperationService } from './financial-operation.service';
+import { FinancialOperationRequest, FinancialOperationResponse, OPERATION_TYPE_LABELS, OperationType } from './financial-operation';
+import { FinancialOperationService, FINANCIAL_OPERATION_DEFAULT_SORT } from './financial-operation.service';
+import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
 
 interface OperationItem {
   productId: number;
@@ -19,13 +19,13 @@ interface OperationItem {
 interface OperationForm {
   amount: number;
   concept: string;
-  operationType: 'SALE' | 'PURCHASE' | 'PAYMENT' | 'CLIENT_PAYMENT';
+  operationType: OperationType;
 }
 
 @Component({
   selector: 'app-financial-operations',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './financial-operations.component.html',
   styleUrls: ['./financial-operations.component.css']
 })
@@ -49,17 +49,21 @@ export class FinancialOperationsComponent implements OnInit {
   selectedProductId = 0;
   selectedProductQuantity = 1;
   items: OperationItem[] = [];
+  productsLoadErrorAgentId: number | null = null;
+  pagination = createPaginationState();
+  readonly operationTypeLabels = OPERATION_TYPE_LABELS;
+  private operationsRequestId = 0;
+  private readonly productsRequestIds = new Map<number, number>();
+  private readonly productsLoading = new Set<number>();
 
-  readonly operationTypeLabels: Record<string, string> = {
-    SALE: 'Venta',
-    PAYMENT: 'Pago A Proveedor',
-    CLIENT_PAYMENT: 'Pago A Cliente',
-    PURCHASE: 'Compra'
-  };
+  get page(): number { return this.pagination.page; }
+  get pageSize(): number { return this.pagination.pageSize; }
+  get totalElements(): number { return this.pagination.totalElements; }
+  get totalPages(): number { return this.pagination.totalPages; }
+  get first(): boolean { return this.pagination.first; }
+  get last(): boolean { return this.pagination.last; }
 
-  getOperationLabel(type: string): string {
-    return this.operationTypeLabels[type] || 'Compra';
-  }
+  getOperationLabel(type: OperationType): string { return this.operationTypeLabels[type]; }
 
   constructor(
     private agentService: AgentService,
@@ -77,10 +81,8 @@ export class FinancialOperationsComponent implements OnInit {
   loadAgents(): void {
     this.agentService.getAllAgents().subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
         this.zone.run(() => {
-          this.agents = list;
-          this.loadProductsForAgents(list);
+          this.agents = data.content;
           this.cdr.detectChanges();
         });
       },
@@ -93,56 +95,31 @@ export class FinancialOperationsComponent implements OnInit {
     });
   }
 
-  loadProductsForAgents(agents: AgentResponse[]): void {
-    if (!agents.length) {
-      this.productsByAgent = {};
-      return;
-    }
-
-    const requests = agents.map(agent =>
-      this.productService.getProductsByAgentId(agent.id).pipe(
-        catchError(() => of([] as ProductResponse[]))
-      )
-    );
-
-    forkJoin(requests).subscribe({
-      next: responses => {
-        const productsMap: Record<number, ProductResponse[]> = {};
-        responses.forEach((response, index) => {
-          const agent = agents[index];
-          const list = Array.isArray(response) ? response : (response?.content ?? []);
-          productsMap[agent.id] = list;
-        });
-
-        this.zone.run(() => {
-          this.productsByAgent = productsMap;
-          this.cdr.detectChanges();
-        });
-      },
-      error: () => {
-        this.zone.run(() => {
-          this.operationError = 'No se pudieron cargar los productos por agente.';
-          this.cdr.detectChanges();
-        });
-      }
-    });
-  }
-
   loadProductsByAgent(agentId: number): void {
+    if (!this.agentExists(agentId) || Object.prototype.hasOwnProperty.call(this.productsByAgent, agentId) || this.productsLoading.has(agentId)) return;
+
+    const requestId = (this.productsRequestIds.get(agentId) ?? 0) + 1;
+    this.productsRequestIds.set(agentId, requestId);
+    this.productsLoading.add(agentId);
+    if (this.productsLoadErrorAgentId === agentId) this.productsLoadErrorAgentId = null;
     this.productService.getProductsByAgentId(agentId).subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
+        if (this.productsRequestIds.get(agentId) !== requestId) return;
         this.zone.run(() => {
+          this.productsLoading.delete(agentId);
+          if (this.productsLoadErrorAgentId === agentId) this.productsLoadErrorAgentId = null;
           this.productsByAgent = {
             ...this.productsByAgent,
-            [agentId]: list
+            [agentId]: Array.isArray(data) ? data : (data?.content ?? [])
           };
           this.cdr.detectChanges();
         });
       },
       error: () => {
+        if (this.productsRequestIds.get(agentId) !== requestId) return;
         this.zone.run(() => {
-          this.operationError = 'No se pudieron cargar los productos.';
+          this.productsLoading.delete(agentId);
+          this.productsLoadErrorAgentId = agentId;
           this.cdr.detectChanges();
         });
       }
@@ -150,68 +127,48 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   refreshProductsForOperation(): void {
-    if (!this.modalRef) {
-      return;
-    }
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (this.modalRef && inventoryAgentId && this.isInventoryAgentValid()) this.loadProductsByAgent(inventoryAgentId);
+  }
 
-    if (this.operationMode !== 'products') {
-      return;
-    }
-
-    if (this.operationForm.operationType === 'PURCHASE') {
-      if (!this.selectedAgentId) {
-        this.productsByAgent = {};
-        this.cdr.detectChanges();
-        return;
-      }
-
-      this.operationAgentId = this.selectedAgentId;
-
-      this.loadProductsByAgent(this.selectedAgentId);
-      return;
-    }
-
-    if (this.operationForm.operationType === 'SALE') {
-      if (!this.operationAgentId) {
-        this.productsByAgent = {};
-        this.cdr.detectChanges();
-        return;
-      }
-
-      this.loadProductsByAgent(this.operationAgentId);
-      return;
-    }
-
-    if (!this.selectedAgentId) {
-      this.productsByAgent = {};
-      this.cdr.detectChanges();
-      return;
-    }
-
-    this.loadProductsByAgent(this.selectedAgentId);
+  retryProductsLoad(): void {
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (inventoryAgentId && this.isInventoryAgentValid()) this.loadProductsByAgent(inventoryAgentId);
   }
 
   selectAgent(agent: AgentResponse): void {
     this.selectedAgentId = agent.id;
-    this.loadOperations(agent.id);
+    this.loadOperations(agent.id, 0);
   }
 
-  loadOperations(agentId: number): void {
-    this.financialOperationService.getByAgentId(agentId).subscribe({
+  loadOperations(agentId: number, page = this.page): void {
+    const requestId = ++this.operationsRequestId;
+    this.financialOperationService.getByAgentId(agentId, { page, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT }).subscribe({
       next: data => {
-        const list = Array.isArray(data) ? data : (data?.content ?? []);
+        if (requestId !== this.operationsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
-          this.operations = list;
+          this.operations = data.content;
+          updatePaginationState(this.pagination, data);
           this.cdr.detectChanges();
         });
       },
       error: () => {
+        if (requestId !== this.operationsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
           this.operationError = 'No se pudieron cargar las operaciones.';
           this.cdr.detectChanges();
         });
       }
     });
+  }
+
+  changePage(page: number): void {
+    if (this.selectedAgentId && page >= 0 && page < this.totalPages && page !== this.page) this.loadOperations(this.selectedAgentId, page);
+  }
+
+  changePageSize(size: string): void {
+    this.pagination.pageSize = Number(size) || DEFAULT_PAGE_SIZE;
+    if (this.selectedAgentId) this.loadOperations(this.selectedAgentId, 0);
   }
 
   openOperationDetail(template: TemplateRef<any>, operation: FinancialOperationResponse): void {
@@ -233,7 +190,6 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     this.resetOperationForm();
-    this.operationAgentId = this.selectedAgentId;
     this.modalRef = this.modalService.show(template, {
       class: 'modal-xl modal-dialog-centered financial-operation-modal'
     });
@@ -247,7 +203,7 @@ export class FinancialOperationsComponent implements OnInit {
       operationType: 'SALE'
     };
     this.operationMode = 'amount';
-    this.operationAgentId = this.selectedAgentId;
+    this.operationAgentId = null;
     this.selectedProductId = 0;
     this.selectedProductQuantity = 1;
     this.items = [];
@@ -256,7 +212,7 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   addItem(): void {
-    if (!this.selectedProductId || this.selectedProductQuantity <= 0) {
+    if (!this.canAddItem()) {
       return;
     }
 
@@ -287,7 +243,7 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     if (this.operationMode === 'amount') {
-      if (!this.operationForm.amount || this.operationForm.amount <= 0) {
+      if (!Number.isFinite(Number(this.operationForm.amount)) || this.operationForm.amount <= 0) {
         this.operationError = 'Ingresa un monto mayor a cero.';
         return;
       }
@@ -295,27 +251,36 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     if (this.operationMode === 'products') {
+      if (!this.isProductOperationType()) {
+        this.operationError = 'Selecciona una venta o compra para registrar productos.';
+        return;
+      }
+      if (!this.isInventoryAgentValid()) {
+        this.operationError = this.operationForm.operationType === 'SALE'
+          ? 'Selecciona un agente de productos válido y diferente al agente principal.'
+          : 'Selecciona un agente principal válido.';
+        return;
+      }
       if (!this.items.length) {
         this.operationError = 'Agrega al menos un producto.';
+        return;
+      }
+      if (!this.items.every(item => this.isCurrentProduct(item.productId) && this.isValidQuantity(item.quantity))) {
+        this.operationError = 'Los productos y cantidades deben pertenecer al agente de productos seleccionado.';
         return;
       }
       this.operationForm.amount = 0;
     }
 
+    const requestAgentId = this.selectedAgentId;
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (!requestAgentId) return;
+
     this.isSavingOperation = true;
     this.operationError = '';
 
     const productsMap: Record<number, number> = {};
-    this.items.forEach(item => {
-      productsMap[item.productId] = item.quantity;
-    });
-
-    const requestAgentId = this.selectedAgentId;
-
-    if (!requestAgentId) {
-      this.operationError = 'Selecciona un agente primero.';
-      return;
-    }
+    this.items.forEach(item => { productsMap[item.productId] = item.quantity; });
 
     const request: FinancialOperationRequest = {
       idAgent: requestAgentId,
@@ -333,6 +298,7 @@ export class FinancialOperationsComponent implements OnInit {
     ).subscribe({
       next: () => {
         this.zone.run(() => {
+          if (inventoryAgentId) this.invalidateProducts(inventoryAgentId);
           this.selectedAgentId = requestAgentId;
           this.loadOperations(requestAgentId);
           this.modalRef?.hide();
@@ -354,7 +320,29 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   isAmountInvalid(): boolean {
-    return this.operationFormSubmitted && (this.operationForm.amount <= 0);
+    return this.operationFormSubmitted && (!Number.isFinite(Number(this.operationForm.amount)) || this.operationForm.amount <= 0);
+  }
+
+  isOperationAgentInvalid(): boolean {
+    return this.operationFormSubmitted && this.operationMode === 'products' && this.operationForm.operationType === 'SALE' && !this.isInventoryAgentValid();
+  }
+
+  isCurrentInventoryLoading(): boolean {
+    const inventoryAgentId = this.getInventoryAgentId();
+    return inventoryAgentId !== null && this.productsLoading.has(inventoryAgentId);
+  }
+
+  hasCurrentInventoryLoadError(): boolean {
+    return this.productsLoadErrorAgentId === this.getInventoryAgentId();
+  }
+
+  canAddItem(): boolean {
+    return this.operationMode === 'products'
+      && this.isInventoryAgentValid()
+      && !this.isCurrentInventoryLoading()
+      && !this.hasCurrentInventoryLoadError()
+      && this.isCurrentProduct(this.selectedProductId)
+      && this.isValidQuantity(this.selectedProductQuantity);
   }
 
   isAgentSelected(agentId: number): boolean {
@@ -366,47 +354,72 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   getCurrentProductOptions(): ProductResponse[] {
-    if (this.operationMode !== 'products') {
-      return [];
-    }
-
-    if (this.operationForm.operationType === 'SALE') {
-      return this.operationAgentId ? (this.productsByAgent[this.operationAgentId] ?? []) : [];
-    }
-
-    return this.selectedAgentId ? (this.productsByAgent[this.selectedAgentId] ?? []) : [];
+    const inventoryAgentId = this.getInventoryAgentId();
+    return inventoryAgentId ? (this.productsByAgent[inventoryAgentId] ?? []) : [];
   }
 
   onOperationTypeChange(): void {
-    if (this.operationForm.operationType === 'SALE' && !this.operationAgentId) {
-      this.operationAgentId = this.selectedAgentId;
-    }
+    this.operationAgentId = null;
+    this.resetProductSelection();
+    this.refreshProductsForOperation();
+  }
 
-    if (this.operationForm.operationType === 'PURCHASE') {
-      this.operationAgentId = this.selectedAgentId;
-    }
-
-    this.selectedProductId = 0;
-    this.items = [];
+  onOperationModeChange(mode: 'amount' | 'products'): void {
+    this.operationMode = mode;
+    if (mode === 'products' && !this.isProductOperationType()) this.operationForm.operationType = 'SALE';
+    this.operationAgentId = null;
+    this.resetProductSelection();
     this.refreshProductsForOperation();
   }
 
   onOperationAgentChange(): void {
-    if (this.operationForm.operationType !== 'SALE' || !this.operationAgentId) {
-      this.selectedProductId = 0;
-      this.items = [];
-      this.cdr.detectChanges();
-      return;
-    }
-
-    if (!this.productsByAgent[this.operationAgentId]) {
-      this.loadProductsByAgent(this.operationAgentId);
-    }
-
-    this.selectedProductId = 0;
-    this.items = [];
+    this.resetProductSelection();
     this.refreshProductsForOperation();
     this.cdr.detectChanges();
+  }
+
+  private getInventoryAgentId(): number | null {
+    if (this.operationMode !== 'products') return null;
+
+    if (this.operationForm.operationType === 'PURCHASE') return this.selectedAgentId;
+
+    return this.operationForm.operationType === 'SALE' ? this.operationAgentId : null;
+  }
+
+  private invalidateProducts(agentId: number): void {
+    const { [agentId]: _, ...remainingProducts } = this.productsByAgent;
+    this.productsByAgent = remainingProducts;
+    this.productsRequestIds.set(agentId, (this.productsRequestIds.get(agentId) ?? 0) + 1);
+    this.productsLoading.delete(agentId);
+    if (this.productsLoadErrorAgentId === agentId) this.productsLoadErrorAgentId = null;
+  }
+
+  private resetProductSelection(): void {
+    this.selectedProductId = 0;
+    this.selectedProductQuantity = 1;
+    this.items = [];
+  }
+
+  private isProductOperationType(): boolean {
+    return this.operationForm.operationType === 'SALE' || this.operationForm.operationType === 'PURCHASE';
+  }
+
+  isInventoryAgentValid(): boolean {
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (!inventoryAgentId || !this.agentExists(inventoryAgentId)) return false;
+    return this.operationForm.operationType !== 'SALE' || inventoryAgentId !== this.selectedAgentId;
+  }
+
+  private agentExists(agentId: number): boolean {
+    return this.agents.some(agent => agent.id === agentId);
+  }
+
+  private isCurrentProduct(productId: number): boolean {
+    return Number.isInteger(productId) && this.getCurrentProductOptions().some(product => product.id === productId);
+  }
+
+  private isValidQuantity(quantity: number): boolean {
+    return Number.isFinite(Number(quantity)) && Number.isInteger(Number(quantity)) && Number(quantity) > 0;
   }
 
   trackByAgentId(index: number, agent: AgentResponse): number {
