@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
@@ -22,8 +22,16 @@ import { removeById, replaceById } from '../shared/collection';
 export class ProductsComponent implements OnInit {
   products: ProductResponse[] = [];
   agents: AgentResponse[] = [];
+  agentsWithProducts: AgentResponse[] = [];
   categories: CategoryResponse[] = [];
   selectedAgentId: number | null = null;
+  agentSearchTerm = '';
+  productFormAgentSearchTerm = '';
+  productFormCategorySearchTerm = '';
+  productSearchTerm = '';
+  isLoadingProducts = false;
+  isLoadingAgentsWithProducts = false;
+  agentsWithProductsError = '';
   modalRef?: BsModalRef;
   isSavingProduct = false;
   productError = '';
@@ -45,6 +53,10 @@ export class ProductsComponent implements OnInit {
   productFormSubmitted = false;
   pagination = createPaginationState();
   private productsRequestId = 0;
+  private agentsWithProductsPage = 0;
+  agentsWithProductsLast = true;
+  private readonly productSearchTerms = new Subject<string>();
+  private readonly agentSearchTerms = new Subject<string>();
 
   constructor(
     private productService: ProductService,
@@ -61,26 +73,90 @@ export class ProductsComponent implements OnInit {
   get totalPages(): number { return this.pagination.totalPages; }
   get first(): boolean { return this.pagination.first; }
   get last(): boolean { return this.pagination.last; }
+  get filteredProductFormAgents(): AgentResponse[] {
+    const term = this.productFormAgentSearchTerm.trim().toLocaleLowerCase();
+    if (!term) return this.agents;
+    return this.agents.filter(agent => [agent.name, agent.email, agent.identificationNumber]
+      .some(value => value?.toLocaleLowerCase().includes(term)));
+  }
+  get filteredProductFormCategories(): CategoryResponse[] {
+    const term = this.productFormCategorySearchTerm.trim().toLocaleLowerCase();
+    return term ? this.categories.filter(category => category.name.toLocaleLowerCase().includes(term)) : this.categories;
+  }
 
   ngOnInit(): void {
     this.loadAgents();
+    this.agentSearchTerms.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        this.isLoadingAgentsWithProducts = true;
+        this.agentsWithProductsError = '';
+        const request$ = term
+          ? this.agentService.searchAgents(term, { page: 0, size: 10 })
+          : this.agentService.getAgentsWithProducts({ page: 0, size: 10 });
+        return request$.pipe(catchError(() => {
+          this.isLoadingAgentsWithProducts = false;
+          this.agentsWithProductsError = 'No se pudieron cargar los agentes.';
+          this.cdr.detectChanges();
+          return EMPTY;
+        }));
+      })
+    ).subscribe(data => this.zone.run(() => {
+      this.agentsWithProducts = data.content;
+      this.agentsWithProductsPage = data.number + 1;
+      this.agentsWithProductsLast = data.last;
+      this.isLoadingAgentsWithProducts = false;
+      this.cdr.detectChanges();
+    }));
+    this.onAgentSearchChange('');
     this.loadCategories();
+    this.productSearchTerms.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        if (!this.selectedAgentId) return EMPTY;
+        const agentId = this.selectedAgentId;
+        this.isLoadingProducts = true;
+        this.productError = '';
+        const request$ = term
+          ? this.productService.searchProducts(agentId, term, { page: 0, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT })
+          : this.productService.getProductsByAgentId(agentId, { page: 0, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT });
+        return request$.pipe(catchError(() => {
+          this.isLoadingProducts = false;
+          this.productError = 'No se pudieron cargar los productos.';
+          this.cdr.detectChanges();
+          return EMPTY;
+        }));
+      })
+    ).subscribe(data => this.zone.run(() => {
+      this.isLoadingProducts = false;
+      this.products = data.content;
+      updatePaginationState(this.pagination, data);
+      this.cdr.detectChanges();
+    }));
   }
 
   loadProductsByAgent(agentId: number, page = this.page): void {
     const requestId = ++this.productsRequestId;
-    this.productService.getProductsByAgentId(agentId, { page, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT }).subscribe({
+    this.isLoadingProducts = true;
+    const request$ = this.productSearchTerm
+      ? this.productService.searchProducts(agentId, this.productSearchTerm, { page, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT })
+      : this.productService.getProductsByAgentId(agentId, { page, size: this.pageSize, sort: PRODUCT_DEFAULT_SORT });
+    request$.subscribe({
       next: data => {
         if (requestId !== this.productsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
           this.products = data.content;
           updatePaginationState(this.pagination, data);
+          this.isLoadingProducts = false;
           this.cdr.detectChanges();
         });
       },
       error: () => {
         if (requestId !== this.productsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
+          this.isLoadingProducts = false;
           this.productError = 'No se pudieron cargar los productos.';
           this.cdr.detectChanges();
         });
@@ -89,7 +165,11 @@ export class ProductsComponent implements OnInit {
   }
 
   selectAgent(agent: AgentResponse): void {
+    if (this.selectedAgentId === agent.id) return;
     this.selectedAgentId = agent.id;
+    this.productSearchTerm = '';
+    this.products = [];
+    this.pagination = createPaginationState(this.pageSize);
     this.loadProductsByAgent(agent.id, 0);
   }
 
@@ -97,8 +177,23 @@ export class ProductsComponent implements OnInit {
     this.productsRequestId++;
     this.selectedAgentId = null;
     this.products = [];
+    this.productSearchTerm = '';
     this.pagination = createPaginationState(this.pageSize);
     this.cdr.detectChanges();
+  }
+
+  onProductSearchChange(term: string): void {
+    this.productSearchTerm = term;
+    this.pagination.page = 0;
+    this.productSearchTerms.next(term);
+  }
+
+  onAgentSearchChange(term: string): void {
+    this.agentSearchTerm = term;
+    this.agentsWithProducts = [];
+    this.agentsWithProductsPage = 0;
+    this.agentsWithProductsLast = true;
+    this.agentSearchTerms.next(term);
   }
 
   changePage(page: number): void {
@@ -111,10 +206,19 @@ export class ProductsComponent implements OnInit {
   }
 
   loadAgents(): void {
-    this.agentService.getAllAgents().subscribe({
+    this.loadAllAgents();
+  }
+
+  private loadAllAgents(page = 0, collected: AgentResponse[] = []): void {
+    this.agentService.getAllAgents({ page, size: 100 }).subscribe({
       next: data => {
+        const allAgents = [...collected, ...data.content];
+        if (!data.last) {
+          this.loadAllAgents(page + 1, allAgents);
+          return;
+        }
         this.zone.run(() => {
-          this.agents = data.content;
+          this.agents = allAgents;
           this.cdr.detectChanges();
         });
       },
@@ -124,6 +228,29 @@ export class ProductsComponent implements OnInit {
           this.cdr.detectChanges();
         });
       }
+    });
+  }
+
+  loadAgentsWithProducts(): void {
+    if (this.isLoadingAgentsWithProducts || this.agentsWithProductsLast && this.agentsWithProducts.length) return;
+    this.isLoadingAgentsWithProducts = true;
+    this.agentsWithProductsError = '';
+    const request$ = this.agentSearchTerm
+      ? this.agentService.searchAgents(this.agentSearchTerm, { page: this.agentsWithProductsPage, size: 10 })
+      : this.agentService.getAgentsWithProducts({ page: this.agentsWithProductsPage, size: 10 });
+    request$.subscribe({
+      next: data => this.zone.run(() => {
+        this.agentsWithProducts = [...this.agentsWithProducts, ...data.content];
+        this.agentsWithProductsPage = data.number + 1;
+        this.agentsWithProductsLast = data.last;
+        this.isLoadingAgentsWithProducts = false;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.isLoadingAgentsWithProducts = false;
+        this.agentsWithProductsError = 'No se pudieron cargar los agentes con productos.';
+        this.cdr.detectChanges();
+      })
     });
   }
 
@@ -169,6 +296,8 @@ export class ProductsComponent implements OnInit {
       agendId: this.selectedAgentId ?? this.agents.find(agent => agent.name === product.agentName)?.id ?? 0
     };
     this.productError = '';
+    this.productFormAgentSearchTerm = '';
+    this.productFormCategorySearchTerm = '';
     this.productFormSubmitted = false;
     this.editingProductId = product.id;
     this.modalRef = this.modalService.show(template);
@@ -185,6 +314,8 @@ export class ProductsComponent implements OnInit {
       agendId: 0
     };
     this.productError = '';
+    this.productFormAgentSearchTerm = '';
+    this.productFormCategorySearchTerm = '';
     this.productFormSubmitted = false;
     this.editingProductId = null;
   }

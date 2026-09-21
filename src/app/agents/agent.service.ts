@@ -19,6 +19,14 @@ export class AgentService {
     return this.http.get<PageResponse<AgentResponse>>(this.apiUrl, { params: toPageParams(request) });
   }
 
+  searchAgents(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/search`, { term }, { params: toPageParams(request) });
+  }
+
+  getAgentsWithProducts(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.get<PageResponse<AgentResponse>>(`${this.apiUrl}/with-products`, { params: toPageParams(request) });
+  }
+
   createAgent(request: AgentRequest): Observable<void> {
     return this.http.post<void>(this.apiUrl, request);
   }

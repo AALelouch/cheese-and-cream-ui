@@ -67,6 +67,28 @@ describe('ProductsComponent', () => {
     expect(agents.getAllAgents).toHaveBeenCalledTimes(2);
   });
 
+  it('filters product-form agents by name, email, or identification without changing the selected value', () => {
+    component.agents = [agent, { ...agent, id: 8, name: 'María', email: 'maria@example.com', identificationNumber: 'CC-55' }];
+    component.productForm.agendId = 7;
+    component.productFormAgentSearchTerm = 'maria@';
+
+    expect(component.filteredProductFormAgents.map(item => item.id)).toEqual([8]);
+    expect(component.productForm.agendId).toBe(7);
+    component.productFormAgentSearchTerm = 'cc-55';
+    expect(component.filteredProductFormAgents.map(item => item.id)).toEqual([8]);
+  });
+
+  it('filters categories by their term and clears both form searches on reset', () => {
+    component.categories = [{ id: 1, name: 'Quesos maduros' }, { id: 2, name: 'Cremas' }];
+    component.productFormCategorySearchTerm = 'crem';
+    component.productFormAgentSearchTerm = 'distrib';
+
+    expect(component.filteredProductFormCategories).toEqual([{ id: 2, name: 'Cremas' }]);
+    component.resetProductForm();
+    expect(component.productFormCategorySearchTerm).toBe('');
+    expect(component.productFormAgentSearchTerm).toBe('');
+  });
+
   it('retains a clear server error when loading products fails', () => {
     products.getProductsByAgentId.mockReturnValue(throwError(() => new Error('offline')));
     component.selectAgent(agent);

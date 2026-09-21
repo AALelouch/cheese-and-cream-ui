@@ -19,6 +19,10 @@ export class FinancialOperationService {
     return this.http.get<PageResponse<FinancialOperationResponse>>(`${this.apiUrl}/agent/${agentId}`, { params: toPageParams(request) });
   }
 
+  searchOperations(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: FINANCIAL_OPERATION_DEFAULT_SORT }): Observable<PageResponse<FinancialOperationResponse>> {
+    return this.http.post<PageResponse<FinancialOperationResponse>>(`${this.apiUrl}/agent/${agentId}/search`, { term }, { params: toPageParams(request) });
+  }
+
   createOperation(request: FinancialOperationRequest): Observable<void> {
     return this.http.post<void>(this.apiUrl, request);
   }

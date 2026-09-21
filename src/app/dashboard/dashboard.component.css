@@ -27,7 +27,9 @@
 .balance-row:last-child { border-bottom: 0; }
 .balance-row strong, .selected-balance strong { color: var(--cream); font-family: 'Space Grotesk', sans-serif; font-variant-numeric: tabular-nums; }
 .agent-picker { display: flex; gap: 8px; margin-top: 9px; }
+.agent-search { margin-top: 9px; }
 .agent-picker select { flex: 1; }
+.more-agents { margin-top: 9px; }
 .clear-button { width: 44px; padding: 0; }
 .selected-balance { margin-top: 14px; padding: 14px; background: var(--cream-wash); border: 1px solid rgb(225 184 93 / .24); border-radius: var(--radius-sm); }
 

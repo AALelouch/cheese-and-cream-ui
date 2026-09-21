@@ -5,7 +5,7 @@ import { IdentificationTypeService } from './identification-type.service';
 import { IdentificationTypeRequest, IdentificationTypeResponse } from './identification-type';
 import { BsModalService, BsModalRef } from 'ngx-bootstrap/modal';
 import { FormsModule } from '@angular/forms';
-import { finalize, timeout } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap, timeout } from 'rxjs';
 import { AgentService, AGENT_DEFAULT_SORT } from './agent.service';
 import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
 import { removeById, replaceById } from '../shared/collection';
@@ -41,7 +41,11 @@ export class AgentsComponent implements OnInit {
   agentFormSubmitted = false;
   editingAgentId: number | null = null;
   pagination = createPaginationState();
+  searchTerm = '';
+  isLoadingAgents = false;
+  agentsLoadError = '';
   private agentsRequestId = 0;
+  private readonly agentSearchTerms = new Subject<string>();
 
   constructor(
     private identificationTypeService: IdentificationTypeService,
@@ -59,29 +63,60 @@ export class AgentsComponent implements OnInit {
   get last(): boolean { return this.pagination.last; }
 
   ngOnInit(): void {
-    this.loadAgents();
+    this.agentSearchTerms.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        this.isLoadingAgents = true;
+        this.agentsLoadError = '';
+        return this.agentService.searchAgents(term, { page: 0, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).pipe(
+          catchError(() => {
+            this.isLoadingAgents = false;
+            this.agentsLoadError = 'No se pudieron cargar los agentes.';
+            this.cdr.detectChanges();
+            return EMPTY;
+          })
+        );
+      })
+    ).subscribe(data => this.zone.run(() => {
+      this.isLoadingAgents = false;
+      this.agents = data.content;
+      updatePaginationState(this.pagination, data);
+      this.cdr.detectChanges();
+    }));
+    this.onSearchTermChange('');
     this.loadIdentificationTypes();
   }
 
   loadAgents(page = this.page): void {
     const requestId = ++this.agentsRequestId;
-    this.agentService.getAllAgents({ page, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).subscribe({
+    this.isLoadingAgents = true;
+    this.agentsLoadError = '';
+    this.agentService.searchAgents(this.searchTerm, { page, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).subscribe({
       next: data => {
         if (requestId !== this.agentsRequestId) return;
         this.zone.run(() => {
           this.agents = data.content;
           updatePaginationState(this.pagination, data);
+          this.isLoadingAgents = false;
           this.cdr.detectChanges();
         });
       },
       error: () => {
         if (requestId !== this.agentsRequestId) return;
         this.zone.run(() => {
-          this.agentError = 'No se pudieron cargar los agentes.';
+          this.isLoadingAgents = false;
+          this.agentsLoadError = 'No se pudieron cargar los agentes.';
           this.cdr.detectChanges();
         });
       }
     });
+  }
+
+  onSearchTermChange(term: string): void {
+    this.searchTerm = term;
+    this.pagination.page = 0;
+    this.agentSearchTerms.next(term);
   }
 
   changePage(page: number): void {

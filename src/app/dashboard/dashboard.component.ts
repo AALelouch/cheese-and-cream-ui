@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
-import { forkJoin } from 'rxjs';
+import { FormsModule } from '@angular/forms';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, forkJoin, Subject, switchMap } from 'rxjs';
 import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { DashboardMetrics } from './dashboard';
@@ -10,7 +11,7 @@ import { LucideChartNoAxesCombined, LucideCircleAlert, LucideClock3, LucideCoins
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CurrencyPipe, LucideChartNoAxesCombined, LucideCircleAlert, LucideClock3, LucideCoins, LucideLoaderCircle, LucideRefreshCw, LucideUserRoundCheck, LucideWalletCards, LucideX],
+  imports: [CurrencyPipe, FormsModule, LucideChartNoAxesCombined, LucideCircleAlert, LucideClock3, LucideCoins, LucideLoaderCircle, LucideRefreshCw, LucideUserRoundCheck, LucideWalletCards, LucideX],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,11 +32,35 @@ export class DashboardComponent implements OnInit {
   readonly isLoadingAgentBalance = signal(false);
   readonly error = signal('');
   readonly agentBalanceError = signal('');
+  readonly agentSearchTerm = signal('');
+  readonly isSearchingAgents = signal(false);
+  readonly agentSearchError = signal('');
+  readonly agentsSearchPage = signal(0);
+  readonly agentsSearchLast = signal(true);
   private dashboardRequestId = 0;
   private agentBalanceRequestId = 0;
+  private readonly agentSearchTerms = new Subject<string>();
 
   ngOnInit(): void {
-    this.loadAgents();
+    this.agentSearchTerms.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(term => {
+        this.isSearchingAgents.set(true);
+        this.agentSearchError.set('');
+        return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+          this.isSearchingAgents.set(false);
+          this.agentSearchError.set('No se pudieron buscar los agentes.');
+          return EMPTY;
+        }));
+      })
+    ).subscribe(data => {
+      this.agents.set(data.content);
+      this.agentsSearchPage.set(data.number + 1);
+      this.agentsSearchLast.set(data.last);
+      this.isSearchingAgents.set(false);
+    });
+    this.onAgentSearchChange('');
     this.loadDashboard(this.selectedMonth());
   }
 
@@ -65,10 +90,24 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  loadAgents(): void {
-    this.agentService.getAllAgents().subscribe({
+  onAgentSearchChange(term: string): void {
+    this.agentSearchTerm.set(term);
+    this.agentSearchTerms.next(term);
+  }
+
+  loadMoreAgents(): void {
+    if (this.isSearchingAgents() || this.agentsSearchLast()) return;
+    this.isSearchingAgents.set(true);
+    this.agentService.searchAgents(this.agentSearchTerm(), { page: this.agentsSearchPage(), size: 10 }).subscribe({
       next: data => {
-        this.agents.set(Array.isArray(data) ? data : (data?.content ?? []));
+        this.agents.update(agents => [...agents, ...data.content]);
+        this.agentsSearchPage.set(data.number + 1);
+        this.agentsSearchLast.set(data.last);
+        this.isSearchingAgents.set(false);
+      },
+      error: () => {
+        this.isSearchingAgents.set(false);
+        this.agentSearchError.set('No se pudieron cargar más agentes.');
       }
     });
   }

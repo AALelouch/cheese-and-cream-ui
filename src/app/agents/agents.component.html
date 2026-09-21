@@ -16,7 +16,13 @@
       <h3>Listado</h3>
       <div class="pill">{{ totalElements }} activos</div>
     </div>
-    <div class="table-wrap" *ngIf="agents.length; else noAgents">
+    <div class="search-field">
+      <label for="agentSearch">Buscar agentes</label>
+      <input id="agentSearch" type="search" class="form-control" [(ngModel)]="searchTerm" (ngModelChange)="onSearchTermChange($event)" placeholder="Nombre, correo, dirección o identificación">
+    </div>
+    <div *ngIf="isLoadingAgents" class="empty-state" aria-live="polite"><strong>Buscando agentes…</strong></div>
+    <div *ngIf="agentsLoadError" class="inline-alert" role="alert">{{ agentsLoadError }}</div>
+    <div class="table-wrap" *ngIf="!isLoadingAgents && !agentsLoadError && agents.length; else noAgents">
       <table class="table">
     <thead>
       <tr>
@@ -52,7 +58,7 @@
       </table>
     </div>
     <ng-template #noAgents>
-      <div class="empty-state" aria-live="polite"><strong>Aún no hay agentes registrados.</strong><span>Agrega el primer agente para empezar a organizar clientes y saldos.</span></div>
+      <div *ngIf="!isLoadingAgents && !agentsLoadError" class="empty-state" aria-live="polite"><strong>{{ searchTerm ? 'No encontramos agentes con esa búsqueda.' : 'Aún no hay agentes registrados.' }}</strong><span>{{ searchTerm ? 'Prueba con otro nombre, correo, dirección o identificación.' : 'Agrega el primer agente para empezar a organizar clientes y saldos.' }}</span></div>
     </ng-template>
     <div class="pagination-bar" *ngIf="totalElements">
       <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>

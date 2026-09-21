@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
@@ -14,6 +14,8 @@ import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from 
 interface OperationItem {
   productId: number;
   quantity: number;
+  agentId: number;
+  productName: string;
 }
 
 interface OperationForm {
@@ -35,6 +37,22 @@ export class FinancialOperationsComponent implements OnInit {
   operations: FinancialOperationResponse[] = [];
   selectedOperation: FinancialOperationResponse | null = null;
   selectedAgentId: number | null = null;
+  agentSearchTerm = '';
+  operationAgentSearchTerm = '';
+  operationSearchTerm = '';
+  productSearchTerm = '';
+  isLoadingAgents = false;
+  isLoadingOperations = false;
+  agentLookupError = '';
+  isLoadingOperationAgents = false;
+  operationAgentLookupError = '';
+  operationAgents: AgentResponse[] = [];
+  operationAgentsSearchPage = 0;
+  operationAgentsSearchLast = true;
+  agentsSearchPage = 0;
+  agentsSearchLast = true;
+  productSearchPage = 0;
+  productSearchLast = true;
   operationAgentId: number | null = null;
   modalRef?: BsModalRef;
   isSavingOperation = false;
@@ -55,6 +73,9 @@ export class FinancialOperationsComponent implements OnInit {
   private operationsRequestId = 0;
   private readonly productsRequestIds = new Map<number, number>();
   private readonly productsLoading = new Set<number>();
+  private readonly agentSearchTerms = new Subject<string>();
+  private readonly operationSearchTerms = new Subject<string>();
+  private readonly operationAgentSearchTerms = new Subject<string>();
 
   get page(): number { return this.pagination.page; }
   get pageSize(): number { return this.pagination.pageSize; }
@@ -75,7 +96,107 @@ export class FinancialOperationsComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadAgents();
+    this.agentSearchTerms.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => {
+      this.isLoadingAgents = true;
+      this.agentLookupError = '';
+      return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+        this.isLoadingAgents = false;
+        this.agentLookupError = 'No se pudieron buscar los agentes.';
+        this.cdr.detectChanges();
+        return EMPTY;
+      }));
+    })).subscribe(data => this.zone.run(() => {
+      this.agents = data.content;
+      this.agentsSearchPage = data.number + 1;
+      this.agentsSearchLast = data.last;
+      this.isLoadingAgents = false;
+      this.cdr.detectChanges();
+    }));
+    this.operationSearchTerms.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => {
+      if (!this.selectedAgentId) return EMPTY;
+      const agentId = this.selectedAgentId;
+      this.isLoadingOperations = true;
+      this.operationError = '';
+      const request$ = term
+        ? this.financialOperationService.searchOperations(agentId, term, { page: 0, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT })
+        : this.financialOperationService.getByAgentId(agentId, { page: 0, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT });
+      return request$.pipe(catchError(() => {
+        this.isLoadingOperations = false;
+        this.operationError = 'No se pudieron cargar las operaciones.';
+        this.cdr.detectChanges();
+        return EMPTY;
+      }));
+    })).subscribe(data => this.zone.run(() => {
+      this.operations = data.content;
+      this.isLoadingOperations = false;
+      updatePaginationState(this.pagination, data);
+      this.cdr.detectChanges();
+    }));
+    this.operationAgentSearchTerms.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => {
+      this.isLoadingOperationAgents = true;
+      this.operationAgentLookupError = '';
+      return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+        this.isLoadingOperationAgents = false;
+        this.operationAgentLookupError = 'No se pudieron buscar los agentes de productos.';
+        this.cdr.detectChanges();
+        return EMPTY;
+      }));
+    })).subscribe(data => this.zone.run(() => {
+      this.operationAgents = data.content;
+      this.operationAgentsSearchPage = data.number + 1;
+      this.operationAgentsSearchLast = data.last;
+      this.isLoadingOperationAgents = false;
+      this.cdr.detectChanges();
+    }));
+    this.onAgentSearchChange('');
+  }
+
+  onAgentSearchChange(term: string): void {
+    this.agentSearchTerm = term;
+    this.agentSearchTerms.next(term);
+  }
+
+  onOperationAgentSearchChange(term: string): void {
+    this.operationAgentSearchTerm = term;
+    this.operationAgentSearchTerms.next(term);
+  }
+
+  loadMoreOperationAgents(): void {
+    if (this.isLoadingOperationAgents || this.operationAgentsSearchLast) return;
+    this.isLoadingOperationAgents = true;
+    this.agentService.searchAgents(this.operationAgentSearchTerm, { page: this.operationAgentsSearchPage, size: 10 }).subscribe({
+      next: data => this.zone.run(() => {
+        this.operationAgents = [...this.operationAgents, ...data.content];
+        this.operationAgentsSearchPage = data.number + 1;
+        this.operationAgentsSearchLast = data.last;
+        this.isLoadingOperationAgents = false;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.isLoadingOperationAgents = false;
+        this.operationAgentLookupError = 'No se pudieron cargar más agentes.';
+        this.cdr.detectChanges();
+      })
+    });
+  }
+
+  loadMoreAgents(): void {
+    if (this.isLoadingAgents || this.agentsSearchLast) return;
+    this.isLoadingAgents = true;
+    this.agentService.searchAgents(this.agentSearchTerm, { page: this.agentsSearchPage, size: 10 }).subscribe({
+      next: data => this.zone.run(() => {
+        this.agents = [...this.agents, ...data.content];
+        this.agentsSearchPage = data.number + 1;
+        this.agentsSearchLast = data.last;
+        this.isLoadingAgents = false;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.isLoadingAgents = false;
+        this.agentLookupError = 'No se pudieron cargar más agentes.';
+        this.cdr.detectChanges();
+      })
+    });
   }
 
   loadAgents(): void {
@@ -112,6 +233,10 @@ export class FinancialOperationsComponent implements OnInit {
             ...this.productsByAgent,
             [agentId]: Array.isArray(data) ? data : (data?.content ?? [])
           };
+          if (!Array.isArray(data)) {
+            this.productSearchPage = data.number + 1;
+            this.productSearchLast = data.last;
+          }
           this.cdr.detectChanges();
         });
       },
@@ -137,29 +262,46 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   selectAgent(agent: AgentResponse): void {
+    if (this.selectedAgentId === agent.id) return;
     this.selectedAgentId = agent.id;
+    this.operationSearchTerm = '';
+    this.productSearchTerm = '';
+    this.operations = [];
+    this.pagination = createPaginationState(this.pageSize);
     this.loadOperations(agent.id, 0);
   }
 
   loadOperations(agentId: number, page = this.page): void {
     const requestId = ++this.operationsRequestId;
-    this.financialOperationService.getByAgentId(agentId, { page, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT }).subscribe({
+    this.isLoadingOperations = true;
+    const request$ = this.operationSearchTerm
+      ? this.financialOperationService.searchOperations(agentId, this.operationSearchTerm, { page, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT })
+      : this.financialOperationService.getByAgentId(agentId, { page, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT });
+    request$.subscribe({
       next: data => {
         if (requestId !== this.operationsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
           this.operations = data.content;
           updatePaginationState(this.pagination, data);
+          this.isLoadingOperations = false;
           this.cdr.detectChanges();
         });
       },
       error: () => {
         if (requestId !== this.operationsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
+          this.isLoadingOperations = false;
           this.operationError = 'No se pudieron cargar las operaciones.';
           this.cdr.detectChanges();
         });
       }
     });
+  }
+
+  onOperationSearchChange(term: string): void {
+    this.operationSearchTerm = term;
+    this.pagination.page = 0;
+    this.operationSearchTerms.next(term);
   }
 
   changePage(page: number): void {
@@ -216,11 +358,20 @@ export class FinancialOperationsComponent implements OnInit {
       return;
     }
 
+    const inventoryAgentId = this.getInventoryAgentId();
+    const product = this.getCurrentProductOptions().find(item => item.id === this.selectedProductId);
+    if (!inventoryAgentId || !product) return;
+
     const existing = this.items.find(item => item.productId === this.selectedProductId);
     if (existing) {
       existing.quantity += this.selectedProductQuantity;
     } else {
-      this.items.push({ productId: this.selectedProductId, quantity: this.selectedProductQuantity });
+      this.items.push({
+        productId: this.selectedProductId,
+        quantity: this.selectedProductQuantity,
+        agentId: inventoryAgentId,
+        productName: product.name
+      });
     }
 
     this.selectedProductId = 0;
@@ -265,8 +416,8 @@ export class FinancialOperationsComponent implements OnInit {
         this.operationError = 'Agrega al menos un producto.';
         return;
       }
-      if (!this.items.every(item => this.isCurrentProduct(item.productId) && this.isValidQuantity(item.quantity))) {
-        this.operationError = 'Los productos y cantidades deben pertenecer al agente de productos seleccionado.';
+      if (!this.items.every(item => Number.isInteger(item.productId) && this.isValidQuantity(item.quantity))) {
+        this.operationError = 'Revisa las cantidades de los productos agregados.';
         return;
       }
       this.operationForm.amount = 0;
@@ -362,6 +513,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationAgentId = null;
     this.resetProductSelection();
     this.refreshProductsForOperation();
+    if (this.operationForm.operationType === 'SALE') this.onOperationAgentSearchChange('');
   }
 
   onOperationModeChange(mode: 'amount' | 'products'): void {
@@ -370,12 +522,56 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationAgentId = null;
     this.resetProductSelection();
     this.refreshProductsForOperation();
+    if (mode === 'products') this.onOperationAgentSearchChange('');
   }
 
   onOperationAgentChange(): void {
-    this.resetProductSelection();
+    this.resetProductInput();
     this.refreshProductsForOperation();
     this.cdr.detectChanges();
+  }
+
+  onProductSearchChange(term: string): void {
+    this.productSearchTerm = term;
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (!inventoryAgentId || !this.isInventoryAgentValid()) return;
+    this.selectedProductId = 0;
+    this.items = [];
+    this.productsLoading.add(inventoryAgentId);
+    this.productService.searchProducts(inventoryAgentId, term, { page: 0, size: 10 }).subscribe({
+      next: data => this.zone.run(() => {
+        this.productsLoading.delete(inventoryAgentId);
+        this.productsByAgent = { ...this.productsByAgent, [inventoryAgentId]: data.content };
+        this.productSearchPage = data.number + 1;
+        this.productSearchLast = data.last;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.productsLoading.delete(inventoryAgentId);
+        this.productsLoadErrorAgentId = inventoryAgentId;
+        this.cdr.detectChanges();
+      })
+    });
+  }
+
+  loadMoreProducts(): void {
+    const inventoryAgentId = this.getInventoryAgentId();
+    if (!inventoryAgentId || this.productsLoading.has(inventoryAgentId) || this.productSearchLast) return;
+    this.productsLoading.add(inventoryAgentId);
+    this.productService.searchProducts(inventoryAgentId, this.productSearchTerm, { page: this.productSearchPage, size: 10 }).subscribe({
+      next: data => this.zone.run(() => {
+        this.productsLoading.delete(inventoryAgentId);
+        this.productsByAgent = { ...this.productsByAgent, [inventoryAgentId]: [...this.getCurrentProductOptions(), ...data.content] };
+        this.productSearchPage = data.number + 1;
+        this.productSearchLast = data.last;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.productsLoading.delete(inventoryAgentId);
+        this.productsLoadErrorAgentId = inventoryAgentId;
+        this.cdr.detectChanges();
+      })
+    });
   }
 
   private getInventoryAgentId(): number | null {
@@ -395,9 +591,16 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   private resetProductSelection(): void {
-    this.selectedProductId = 0;
-    this.selectedProductQuantity = 1;
+    this.resetProductInput();
     this.items = [];
+  }
+
+  private resetProductInput(): void {
+    this.selectedProductId = 0;
+    this.productSearchTerm = '';
+    this.selectedProductQuantity = 1;
+    this.productSearchPage = 0;
+    this.productSearchLast = true;
   }
 
   private isProductOperationType(): boolean {
@@ -411,7 +614,7 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   private agentExists(agentId: number): boolean {
-    return this.agents.some(agent => agent.id === agentId);
+    return agentId === this.selectedAgentId || agentId === this.operationAgentId || this.agents.some(agent => agent.id === agentId) || this.operationAgents.some(agent => agent.id === agentId);
   }
 
   private isCurrentProduct(productId: number): boolean {

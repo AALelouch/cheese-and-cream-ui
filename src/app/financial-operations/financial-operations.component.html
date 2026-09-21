@@ -11,10 +11,13 @@
   </div>
 
   <div class="card">
-    <div class="card-header">
-      <h3>Agentes</h3>
-      <div class="pill">{{ agents.length }} activos</div>
+    <div class="card-header"><h3>Buscar agente</h3><div class="pill">{{ agents.length }} resultados</div></div>
+    <div class="search-field">
+      <label for="operationAgentSearch">Agente</label>
+      <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
     </div>
+    <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando agentes…</div>
+    <div *ngIf="agentLookupError" class="inline-alert" role="alert">{{ agentLookupError }}</div>
     <div class="agent-buttons">
       <button
         type="button"
@@ -25,6 +28,7 @@
       >
         {{ agent.name }}
       </button>
+      <button *ngIf="!agentsSearchLast" type="button" class="btn btn-outline" (click)="loadMoreAgents()" [disabled]="isLoadingAgents">Ver más agentes</button>
     </div>
   </div>
 
@@ -33,7 +37,13 @@
       <h3 id="operations-list-title">Operaciones</h3>
       <div class="pill">{{ totalElements }} items</div>
     </div>
-    <div class="table-wrap" *ngIf="selectedAgentId && operations.length">
+    <div *ngIf="selectedAgentId" class="search-field">
+      <label for="operationSearch">Buscar operaciones</label>
+      <input id="operationSearch" type="search" class="form-control" [(ngModel)]="operationSearchTerm" (ngModelChange)="onOperationSearchChange($event)" placeholder="Concepto de la operación">
+    </div>
+    <div *ngIf="isLoadingOperations" class="empty-state" aria-live="polite"><strong>Buscando operaciones…</strong></div>
+    <div *ngIf="operationError && selectedAgentId" class="inline-alert" role="alert">{{ operationError }}</div>
+    <div class="table-wrap" *ngIf="selectedAgentId && !isLoadingOperations && !operationError && operations.length">
       <table class="table">
         <thead>
           <tr>
@@ -73,9 +83,9 @@
       <strong>Elige un agente para revisar sus movimientos.</strong>
       <span>Sus ventas, compras y pagos aparecerán aquí.</span>
     </div>
-    <div *ngIf="selectedAgentId && !operations.length" class="empty-state" aria-live="polite">
-      <strong>Este agente aún no tiene operaciones.</strong>
-      <span>Usa “Crear operación” para registrar el primer movimiento.</span>
+    <div *ngIf="selectedAgentId && !isLoadingOperations && !operationError && !operations.length" class="empty-state" aria-live="polite">
+      <strong>{{ operationSearchTerm ? 'No hay operaciones que coincidan.' : 'Este agente aún no tiene operaciones.' }}</strong>
+      <span>{{ operationSearchTerm ? 'Prueba con otro concepto.' : 'Usa “Crear operación” para registrar el primer movimiento.' }}</span>
     </div>
     <div class="pagination-bar" *ngIf="selectedAgentId && totalElements">
       <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
@@ -120,7 +130,8 @@
           </select>
         </div>
         <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
-          <label for="operationAgent">Agente de los productos</label>
+          <label for="operationAgent">Agente del producto</label>
+			<input type="search" class="form-control product-search" [(ngModel)]="operationAgentSearchTerm" (ngModelChange)="onOperationAgentSearchChange($event)" name="operationAgentSearch" placeholder="Buscar agente de productos">
           <select
             id="operationAgent"
             class="form-control"
@@ -130,9 +141,12 @@
             name="operationAgent"
           >
             <option [ngValue]="null" disabled>Selecciona un agente</option>
-            <option *ngFor="let agent of agents; trackBy: trackByAgentId" [ngValue]="agent.id" [disabled]="agent.id === selectedAgentId">{{ agent.name }}</option>
+            <option *ngFor="let agent of operationAgents; trackBy: trackByAgentId" [ngValue]="agent.id" [disabled]="agent.id === selectedAgentId">{{ agent.name }}</option>
           </select>
-          <span class="field-note">Se muestran productos del agente elegido para la venta.</span>
+			<span *ngIf="isLoadingOperationAgents" class="field-note">Buscando agentes…</span>
+			<span *ngIf="operationAgentLookupError" class="field-error">{{ operationAgentLookupError }}</span>
+			<button *ngIf="!operationAgentsSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreOperationAgents()" [disabled]="isLoadingOperationAgents">Ver más agentes</button>
+          <span class="field-note">Elige un agente para cada producto. Los productos ya agregados se mantienen en la venta.</span>
           <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un agente diferente al agente principal.</span>
         </div>
         <div class="form-group">
@@ -161,10 +175,12 @@
         </div>
         <div *ngIf="operationMode === 'products'" class="form-group">
           <label for="operationProduct">Producto</label>
+          <input type="search" class="form-control product-search" [(ngModel)]="productSearchTerm" (ngModelChange)="onProductSearchChange($event)" name="operationProductSearch" placeholder="Buscar producto" [disabled]="!isInventoryAgentValid()">
           <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct" [disabled]="!isInventoryAgentValid() || isCurrentInventoryLoading() || hasCurrentInventoryLoadError() || !getCurrentProductOptions().length">
             <option [ngValue]="0" disabled>Selecciona un producto</option>
             <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }}</option>
           </select>
+          <button *ngIf="!productSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreProducts()" [disabled]="isCurrentInventoryLoading()">Ver más productos</button>
           <span *ngIf="isCurrentInventoryLoading()" class="field-note" aria-live="polite">Cargando productos…</span>
           <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este agente no tiene productos disponibles.</span>
           <span *ngIf="hasCurrentInventoryLoadError()" class="field-error" role="alert">No se pudieron cargar los productos. <button type="button" class="btn btn-xs btn-outline" (click)="retryProductsLoad()">Reintentar</button></span>
@@ -192,7 +208,7 @@
       <div *ngIf="operationMode === 'products' && items.length" class="items-list">
         <div class="items-title">Productos agregados</div>
         <div class="items-row" *ngFor="let item of items; trackBy: trackByItemProductId">
-          <div>{{ getProductName(item.productId) }}</div>
+          <div>{{ item.productName }}</div>
           <div class="items-qty">x{{ item.quantity }}</div>
           <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
         </div>

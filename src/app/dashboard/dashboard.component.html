@@ -92,6 +92,7 @@
 					<svg lucideUserRoundCheck class="section-icon" size="22"></svg>
 				</div>
 				<label for="agent-select">Selecciona un agente para consultar su saldo pendiente</label>
+				<input id="agent-search" type="search" class="form-control agent-search" [ngModel]="agentSearchTerm()" (ngModelChange)="onAgentSearchChange($event)" placeholder="Buscar por nombre, correo o identificación">
 				<div class="agent-picker">
 					  <select id="agent-select" class="form-control" [value]="selectedAgentId() ?? ''" (change)="onAgentChange($event)" [disabled]="!agents().length">
 						<option value="">Elige un agente</option>
@@ -105,6 +106,9 @@
 						</button>
 					}
 				</div>
+				@if (isSearchingAgents()) { <p class="lookup-state" aria-live="polite"><svg lucideLoaderCircle size="16" class="spin"></svg> Buscando agentes...</p> }
+				@if (agentSearchError()) { <p class="field-error" role="alert">{{ agentSearchError() }}</p> }
+				@if (!agentsSearchLast()) { <button type="button" class="btn btn-xs btn-outline more-agents" (click)="loadMoreAgents()" [disabled]="isSearchingAgents()">Ver más agentes</button> }
 				@if (isLoadingAgentBalance()) {
 					  <p class="lookup-state" aria-live="polite"><svg lucideLoaderCircle size="16" class="spin"></svg> Cargando saldo...</p>
 				} @else if (agentBalanceError()) {

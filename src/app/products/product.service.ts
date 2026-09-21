@@ -19,6 +19,10 @@ export class ProductService {
     return this.http.get<PageResponse<ProductResponse>>(`${this.apiUrl}/agent/${agentId}`, { params: toPageParams(request) });
   }
 
+  searchProducts(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: PRODUCT_DEFAULT_SORT }): Observable<PageResponse<ProductResponse>> {
+    return this.http.post<PageResponse<ProductResponse>>(`${this.apiUrl}/agent/${agentId}/search`, { term }, { params: toPageParams(request) });
+  }
+
   createProduct(request: ProductRequest): Observable<void> {
     return this.http.post<void>(this.apiUrl, request);
   }

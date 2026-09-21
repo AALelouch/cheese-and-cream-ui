@@ -1,5 +1,6 @@
 .agent-buttons { display: flex; flex-wrap: wrap; gap: 9px; }
 .agent-buttons .btn.active { color: var(--cream); background: var(--cream-wash); border-color: var(--butter); }
+.search-field { display: grid; gap: 7px; margin: 0 0 18px; max-width: 560px; }
 .type-row { display: flex; flex: 1; align-items: center; min-width: 0; }
 .type-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .type-input { max-width: 260px; }

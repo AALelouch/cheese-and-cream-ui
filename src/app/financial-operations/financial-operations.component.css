@@ -1,4 +1,7 @@
 .agent-buttons, .mode-toggle { display: flex; flex-wrap: wrap; gap: 9px; }
+.search-field { display: grid; gap: 7px; margin: 0 0 18px; max-width: 560px; }
+.product-search { margin-bottom: 8px; }
+.more-products { margin-top: 8px; }
 .agent-buttons .btn.active, .mode-toggle .btn.active { color: var(--cream); background: var(--cream-wash); border-color: var(--butter); }
 .op-badge { display: inline-flex; justify-content: center; padding: 4px 9px; border-radius: 999px; font-size: .75rem; font-weight: 800; }
 .op-in { color: var(--success); background: rgb(141 187 145 / .14); border: 1px solid rgb(141 187 145 / .45); }
