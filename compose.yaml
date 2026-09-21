@@ -1,0 +1,9 @@
+services:
+  frontend:
+    build:
+      context: .
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    environment:
+      API_BASE_URL: "${API_BASE_URL:-http://localhost:8080}"
+    restart: unless-stopped

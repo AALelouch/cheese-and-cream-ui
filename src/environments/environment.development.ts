@@ -1,6 +1,6 @@
-import { createEnvironment } from './environment.config';
+import { apiBaseUrlFromEnvironment, createEnvironment } from './environment.config';
 
 export const environment = createEnvironment({
   production: false,
-  apiBaseUrl: 'http://localhost:8080'
+  apiBaseUrl: apiBaseUrlFromEnvironment('http://localhost:8080')
 });

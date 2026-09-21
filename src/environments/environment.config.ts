@@ -26,6 +26,14 @@ interface EnvironmentOptions {
   readonly apiBaseUrl: string;
 }
 
+declare global {
+  interface Window {
+    __env?: {
+      API_BASE_URL?: string;
+    };
+  }
+}
+
 const API_PATHS = {
   login: '/api/login',
   agents: '/api/agents',
@@ -38,6 +46,12 @@ const API_PATHS = {
 
 const AUTH_STORAGE_KEY = 'cheeseandcream.apiKey';
 const AUTHORIZATION_SCHEME = 'Basic';
+
+export function apiBaseUrlFromEnvironment(fallback: string): string {
+  if (typeof window === 'undefined') return fallback;
+
+  return window.__env?.API_BASE_URL?.trim() || fallback;
+}
 
 export function createEnvironment({ production, apiBaseUrl }: EnvironmentOptions): AppEnvironment {
   const normalizedBaseUrl = apiBaseUrl.replace(/\/+$/, '');

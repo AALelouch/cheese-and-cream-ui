@@ -53,11 +53,11 @@ desarrollo usa:
 http://localhost:8080
 ```
 
-El build de producción usa rutas relativas (`/api/...`) para consumir el backend
-desde el mismo origen. Si el backend de producción está en otro dominio, cambia
-únicamente `apiBaseUrl` en `src/environments/environment.ts`. Angular sustituye
-automáticamente ese archivo por `environment.development.ts` al ejecutar
-`npm start`.
+El build de producción usa rutas relativas (`/api/...`) por defecto. La variable
+de entorno `API_BASE_URL` permite indicar otro host en tiempo de ejecución, sin
+volver a compilar la imagen. Angular sustituye `environment.ts` por
+`environment.development.ts` al ejecutar `npm start`, donde se conserva
+`http://localhost:8080` como valor predeterminado.
 
 Rutas principales utilizadas:
 
@@ -101,6 +101,18 @@ La aplicación estará disponible en `http://localhost:4200/`.
 ```bash
 npm run build
 ```
+
+### Docker Compose
+
+Copia `.env.example` como `.env` si necesitas cambiar el host de la API o el
+puerto publicado. Después inicia el frontend con:
+
+```bash
+docker compose up --build
+```
+
+La aplicación estará disponible en `http://localhost:4200/`. Las variables
+admitidas son `API_BASE_URL` y `FRONTEND_PORT`.
 
 ### Tests
 

@@ -22,13 +22,23 @@ const page = <T>(content: T[]) => ({ content, totalElements: content.length, tot
 describe('FinancialOperationsComponent', () => {
   let component: FinancialOperationsComponent;
   let fixture: ComponentFixture<FinancialOperationsComponent>;
-  let agentService: { getAllAgents: ReturnType<typeof vi.fn> };
+  let agentService: {
+    getAllAgents: ReturnType<typeof vi.fn>;
+    searchAgents: ReturnType<typeof vi.fn>;
+    getAgentsWithProducts: ReturnType<typeof vi.fn>;
+    searchAgentsWithProducts: ReturnType<typeof vi.fn>;
+  };
   let productService: { getProductsByAgentId: ReturnType<typeof vi.fn> };
   let financialOperationService: { getByAgentId: ReturnType<typeof vi.fn>; createOperation: ReturnType<typeof vi.fn> };
   let modalService: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    agentService = { getAllAgents: vi.fn(() => of(page(agents))) };
+    agentService = {
+      getAllAgents: vi.fn(() => of(page(agents))),
+      searchAgents: vi.fn(() => of(page([]))),
+      getAgentsWithProducts: vi.fn(() => of(page([]))),
+      searchAgentsWithProducts: vi.fn(() => of(page([])))
+    };
     productService = { getProductsByAgentId: vi.fn(() => of(page([]))) };
     financialOperationService = { getByAgentId: vi.fn(() => of(page([]))), createOperation: vi.fn(() => of(void 0)) };
     modalService = { show: vi.fn(() => ({ hide: vi.fn() })) };
@@ -53,14 +63,15 @@ describe('FinancialOperationsComponent', () => {
     component.onOperationModeChange('products');
   }
 
-  it('loads agents on demand and reports an agents error', async () => {
-    component.loadAgents();
+  it('loads general agents on init and reports an agents error', async () => {
     expect(component.agents).toEqual(agents);
+    expect(agentService.getAllAgents).toHaveBeenCalledTimes(1);
 
     agentService.getAllAgents.mockReturnValue(throwError(() => new Error('offline')));
     const anotherFixture = TestBed.createComponent(FinancialOperationsComponent);
+    anotherFixture.detectChanges();
     anotherFixture.componentInstance.loadAgents();
-    expect(anotherFixture.componentInstance.operationError).toContain('agentes');
+    expect(anotherFixture.componentInstance.agentLookupError).toContain('agentes');
   });
 
   it('requires an explicit, different inventory agent for SALE and loads only its products', () => {
@@ -78,7 +89,36 @@ describe('FinancialOperationsComponent', () => {
     component.operationForm.concept = 'Venta';
     component.items = [operationItem(2, 1)];
     component.saveOperation();
-    expect(component.operationError).toContain('diferente');
+    expect(component.operationFormError).toContain('diferente');
+  });
+
+  it('uses only agents with products when searching the inventory agent for a sale', () => {
+    component.operationAgentsSearchLast = false;
+    component.operationAgentSearchTerm = '';
+    component.loadMoreOperationAgents();
+    expect(agentService.getAgentsWithProducts).toHaveBeenCalledWith({ page: 0, size: 10 });
+    expect(agentService.searchAgents).not.toHaveBeenCalled();
+
+    component.operationAgentsSearchLast = false;
+    component.operationAgentSearchTerm = 'inventario';
+    component.loadMoreOperationAgents();
+    expect(agentService.searchAgentsWithProducts).toHaveBeenCalledWith('inventario', { page: 1, size: 10 });
+  });
+
+  it('loads and searches only inventory agents when the sale-with-products modal opens', async () => {
+    vi.useFakeTimers();
+    try {
+      openForProducts();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(agentService.getAgentsWithProducts).toHaveBeenCalledWith({ page: 0, size: 10 });
+
+      component.onOperationAgentSearchChange('proveedor');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(agentService.searchAgentsWithProducts).toHaveBeenCalledWith('proveedor', { page: 0, size: 10 });
+      expect(agentService.searchAgents).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('uses the main agent inventory for PURCHASE and never sends operationAgentId as idAgent', () => {
@@ -159,7 +199,7 @@ describe('FinancialOperationsComponent', () => {
     component.items = [operationItem(20, Number.NaN)];
     component.operationForm.concept = 'Venta';
     component.saveOperation();
-    expect(component.operationError).toContain('cantidades de los productos');
+    expect(component.operationFormError).toContain('cantidades de los productos');
   });
 
   it('caches successes, retries failures, and keeps delayed results out of the active selector', () => {
@@ -212,7 +252,15 @@ describe('FinancialOperationsComponent', () => {
     component.operationForm.amount = 5;
     component.operationMode = 'amount';
     component.saveOperation();
-    expect(component.operationError).toContain('No se pudo crear');
+    expect(component.operationFormError).toContain('No se pudo crear');
+  });
+
+  it('keeps modal validation errors out of the operations table state', () => {
+    component.selectedAgentId = 1;
+    component.saveOperation();
+
+    expect(component.operationFormError).toBe('El concepto es obligatorio.');
+    expect(component.operationsLoadError).toBe('');
   });
 
   it('exposes the invariants used by the guarded template controls', () => {

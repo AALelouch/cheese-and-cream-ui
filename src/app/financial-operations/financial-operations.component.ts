@@ -56,7 +56,8 @@ export class FinancialOperationsComponent implements OnInit {
   operationAgentId: number | null = null;
   modalRef?: BsModalRef;
   isSavingOperation = false;
-  operationError = '';
+  operationsLoadError = '';
+  operationFormError = '';
   operationFormSubmitted = false;
   operationMode: 'amount' | 'products' = 'amount';
   operationForm: OperationForm = {
@@ -116,13 +117,13 @@ export class FinancialOperationsComponent implements OnInit {
       if (!this.selectedAgentId) return EMPTY;
       const agentId = this.selectedAgentId;
       this.isLoadingOperations = true;
-      this.operationError = '';
+      this.operationsLoadError = '';
       const request$ = term
         ? this.financialOperationService.searchOperations(agentId, term, { page: 0, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT })
         : this.financialOperationService.getByAgentId(agentId, { page: 0, size: this.pageSize, sort: FINANCIAL_OPERATION_DEFAULT_SORT });
       return request$.pipe(catchError(() => {
         this.isLoadingOperations = false;
-        this.operationError = 'No se pudieron cargar las operaciones.';
+        this.operationsLoadError = 'No se pudieron cargar las operaciones.';
         this.cdr.detectChanges();
         return EMPTY;
       }));
@@ -135,7 +136,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationAgentSearchTerms.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => {
       this.isLoadingOperationAgents = true;
       this.operationAgentLookupError = '';
-      return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+      return this.getOperationAgentsRequest(term, { page: 0, size: 10 }).pipe(catchError(() => {
         this.isLoadingOperationAgents = false;
         this.operationAgentLookupError = 'No se pudieron buscar los agentes de productos.';
         this.cdr.detectChanges();
@@ -148,7 +149,7 @@ export class FinancialOperationsComponent implements OnInit {
       this.isLoadingOperationAgents = false;
       this.cdr.detectChanges();
     }));
-    this.onAgentSearchChange('');
+    this.loadAgents();
   }
 
   onAgentSearchChange(term: string): void {
@@ -158,13 +159,22 @@ export class FinancialOperationsComponent implements OnInit {
 
   onOperationAgentSearchChange(term: string): void {
     this.operationAgentSearchTerm = term;
+    this.operationAgents = [];
+    this.operationAgentsSearchPage = 0;
+    this.operationAgentsSearchLast = true;
     this.operationAgentSearchTerms.next(term);
+  }
+
+  private getOperationAgentsRequest(term: string, request: { page: number; size: number }) {
+    return term
+      ? this.agentService.searchAgentsWithProducts(term, request)
+      : this.agentService.getAgentsWithProducts(request);
   }
 
   loadMoreOperationAgents(): void {
     if (this.isLoadingOperationAgents || this.operationAgentsSearchLast) return;
     this.isLoadingOperationAgents = true;
-    this.agentService.searchAgents(this.operationAgentSearchTerm, { page: this.operationAgentsSearchPage, size: 10 }).subscribe({
+    this.getOperationAgentsRequest(this.operationAgentSearchTerm, { page: this.operationAgentsSearchPage, size: 10 }).subscribe({
       next: data => this.zone.run(() => {
         this.operationAgents = [...this.operationAgents, ...data.content];
         this.operationAgentsSearchPage = data.number + 1;
@@ -209,7 +219,7 @@ export class FinancialOperationsComponent implements OnInit {
       },
       error: () => {
         this.zone.run(() => {
-          this.operationError = 'No se pudieron cargar los agentes.';
+          this.agentLookupError = 'No se pudieron cargar los agentes.';
           this.cdr.detectChanges();
         });
       }
@@ -291,7 +301,7 @@ export class FinancialOperationsComponent implements OnInit {
         if (requestId !== this.operationsRequestId || this.selectedAgentId !== agentId) return;
         this.zone.run(() => {
           this.isLoadingOperations = false;
-          this.operationError = 'No se pudieron cargar las operaciones.';
+          this.operationsLoadError = 'No se pudieron cargar las operaciones.';
           this.cdr.detectChanges();
         });
       }
@@ -327,7 +337,7 @@ export class FinancialOperationsComponent implements OnInit {
 
   openOperationModal(template: TemplateRef<any>): void {
     if (!this.selectedAgentId) {
-      this.operationError = 'Selecciona un agente primero.';
+      this.agentLookupError = 'Selecciona un agente primero.';
       return;
     }
 
@@ -346,10 +356,15 @@ export class FinancialOperationsComponent implements OnInit {
     };
     this.operationMode = 'amount';
     this.operationAgentId = null;
+    this.operationAgentSearchTerm = '';
+    this.operationAgents = [];
+    this.operationAgentsSearchPage = 0;
+    this.operationAgentsSearchLast = true;
+    this.operationAgentLookupError = '';
     this.selectedProductId = 0;
     this.selectedProductQuantity = 1;
     this.items = [];
-    this.operationError = '';
+    this.operationFormError = '';
     this.operationFormSubmitted = false;
   }
 
@@ -389,13 +404,13 @@ export class FinancialOperationsComponent implements OnInit {
 
     this.operationFormSubmitted = true;
     if (!this.operationForm.concept.trim()) {
-      this.operationError = 'El concepto es obligatorio.';
+      this.operationFormError = 'El concepto es obligatorio.';
       return;
     }
 
     if (this.operationMode === 'amount') {
       if (!Number.isFinite(Number(this.operationForm.amount)) || this.operationForm.amount <= 0) {
-        this.operationError = 'Ingresa un monto mayor a cero.';
+        this.operationFormError = 'Ingresa un monto mayor a cero.';
         return;
       }
       this.items = [];
@@ -403,21 +418,21 @@ export class FinancialOperationsComponent implements OnInit {
 
     if (this.operationMode === 'products') {
       if (!this.isProductOperationType()) {
-        this.operationError = 'Selecciona una venta o compra para registrar productos.';
+        this.operationFormError = 'Selecciona una venta o compra para registrar productos.';
         return;
       }
       if (!this.isInventoryAgentValid()) {
-        this.operationError = this.operationForm.operationType === 'SALE'
+        this.operationFormError = this.operationForm.operationType === 'SALE'
           ? 'Selecciona un agente de productos válido y diferente al agente principal.'
           : 'Selecciona un agente principal válido.';
         return;
       }
       if (!this.items.length) {
-        this.operationError = 'Agrega al menos un producto.';
+        this.operationFormError = 'Agrega al menos un producto.';
         return;
       }
       if (!this.items.every(item => Number.isInteger(item.productId) && this.isValidQuantity(item.quantity))) {
-        this.operationError = 'Revisa las cantidades de los productos agregados.';
+        this.operationFormError = 'Revisa las cantidades de los productos agregados.';
         return;
       }
       this.operationForm.amount = 0;
@@ -428,7 +443,7 @@ export class FinancialOperationsComponent implements OnInit {
     if (!requestAgentId) return;
 
     this.isSavingOperation = true;
-    this.operationError = '';
+    this.operationFormError = '';
 
     const productsMap: Record<number, number> = {};
     this.items.forEach(item => { productsMap[item.productId] = item.quantity; });
@@ -459,7 +474,7 @@ export class FinancialOperationsComponent implements OnInit {
       },
       error: () => {
         this.zone.run(() => {
-          this.operationError = 'No se pudo crear la operacion.';
+          this.operationFormError = 'No se pudo crear la operacion.';
           this.cdr.detectChanges();
         });
       }

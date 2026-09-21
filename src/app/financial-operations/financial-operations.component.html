@@ -42,8 +42,8 @@
       <input id="operationSearch" type="search" class="form-control" [(ngModel)]="operationSearchTerm" (ngModelChange)="onOperationSearchChange($event)" placeholder="Concepto de la operación">
     </div>
     <div *ngIf="isLoadingOperations" class="empty-state" aria-live="polite"><strong>Buscando operaciones…</strong></div>
-    <div *ngIf="operationError && selectedAgentId" class="inline-alert" role="alert">{{ operationError }}</div>
-    <div class="table-wrap" *ngIf="selectedAgentId && !isLoadingOperations && !operationError && operations.length">
+    <div *ngIf="operationsLoadError && selectedAgentId" class="inline-alert" role="alert">{{ operationsLoadError }}</div>
+    <div class="table-wrap" *ngIf="selectedAgentId && !isLoadingOperations && !operationsLoadError && operations.length">
       <table class="table">
         <thead>
           <tr>
@@ -83,7 +83,7 @@
       <strong>Elige un agente para revisar sus movimientos.</strong>
       <span>Sus ventas, compras y pagos aparecerán aquí.</span>
     </div>
-    <div *ngIf="selectedAgentId && !isLoadingOperations && !operationError && !operations.length" class="empty-state" aria-live="polite">
+    <div *ngIf="selectedAgentId && !isLoadingOperations && !operationsLoadError && !operations.length" class="empty-state" aria-live="polite">
       <strong>{{ operationSearchTerm ? 'No hay operaciones que coincidan.' : 'Este agente aún no tiene operaciones.' }}</strong>
       <span>{{ operationSearchTerm ? 'Prueba con otro concepto.' : 'Usa “Crear operación” para registrar el primer movimiento.' }}</span>
     </div>
@@ -213,8 +213,8 @@
           <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
         </div>
       </div>
-      <div *ngIf="operationError" class="inline-alert" role="alert">
-        {{ operationError }}
+      <div *ngIf="operationFormError" class="inline-alert" role="alert">
+        {{ operationFormError }}
       </div>
     </div>
   </ng-template>
