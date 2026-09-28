@@ -10,14 +10,14 @@ const metrics = { totalRevenue: 100, totalProfit: 40, pendingBalance: 12 };
 describe('DashboardComponent', () => {
   let component: DashboardComponent;
   let dashboard: { getMonthlyMetrics: ReturnType<typeof vi.fn>; getTotalPendingBalance: ReturnType<typeof vi.fn>; getMonthlyPendingBalance: ReturnType<typeof vi.fn>; getAgentPendingBalance: ReturnType<typeof vi.fn> };
-  let agents: { searchAgents: ReturnType<typeof vi.fn> };
+  let agents: { getClients: ReturnType<typeof vi.fn>; searchClients: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     dashboard = {
       getMonthlyMetrics: vi.fn(() => of(metrics)), getTotalPendingBalance: vi.fn(() => of(30)),
       getMonthlyPendingBalance: vi.fn(() => of(12)), getAgentPendingBalance: vi.fn(() => of(8))
     };
-    agents = { searchAgents: vi.fn(() => of({ content: [], number: 0, last: true })) };
+    agents = { getClients: vi.fn(() => of({ content: [], number: 0, last: true })), searchClients: vi.fn(() => of({ content: [], number: 0, last: true })) };
     await TestBed.configureTestingModule({ imports: [DashboardComponent], providers: [
       { provide: DashboardService, useValue: dashboard }, { provide: AgentService, useValue: agents }
     ] }).compileComponents();

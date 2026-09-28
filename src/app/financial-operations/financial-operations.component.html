@@ -3,7 +3,7 @@
     <div>
       <p class="eyebrow">Operaciones</p>
       <h2>Operaciones Financieras</h2>
-      <p class="subtitle">Selecciona un agente para ver sus operaciones.</p>
+      <p class="subtitle">Selecciona un cliente o proveedor para ver sus operaciones.</p>
     </div>
     <div class="actions">
       <button class="btn btn-primary" (click)="openOperationModal(operationModal)">Crear Operacion</button>
@@ -11,12 +11,19 @@
   </div>
 
   <div class="card">
-    <div class="card-header"><h3>Buscar agente</h3><div class="pill">{{ agents.length }} resultados</div></div>
+    <div class="card-header"><h3>Agentes</h3><div class="pill">{{ agents.length }} resultados</div></div>
     <div class="search-field">
-      <label for="operationAgentSearch">Agente</label>
-      <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+      <div class="agent-search-controls">
+        <label class="visually-hidden" for="partyRole">Mostrar agentes</label>
+        <select id="partyRole" class="form-control party-role-select" [ngModel]="partyRole" (ngModelChange)="onPartyRoleChange($event)" name="partyRole">
+          <option [ngValue]="'CLIENT'">Clientes</option>
+          <option [ngValue]="'PROVIDER'">Proveedores</option>
+        </select>
+        <label class="visually-hidden" for="operationAgentSearch">Buscar agentes</label>
+        <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+      </div>
     </div>
-    <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando agentes…</div>
+    <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando {{ partyRole === 'CLIENT' ? 'clientes' : 'proveedores' }}…</div>
     <div *ngIf="agentLookupError" class="inline-alert" role="alert">{{ agentLookupError }}</div>
     <div class="agent-buttons">
       <button
@@ -123,15 +130,15 @@
             (ngModelChange)="onOperationTypeChange()"
             name="operationType"
           >
-            <option [ngValue]="'SALE'">Venta</option>
-            <option [ngValue]="'PURCHASE'">Compra</option>
-            <option *ngIf="operationMode === 'amount'" [ngValue]="'PAYMENT'">Pago a Proveedor</option>
-            <option *ngIf="operationMode === 'amount'" [ngValue]="'CLIENT_PAYMENT'">Pago a Cliente</option>
+            <option *ngIf="isOperationTypeAllowed('SALE')" [ngValue]="'SALE'">Venta</option>
+            <option *ngIf="isOperationTypeAllowed('PURCHASE')" [ngValue]="'PURCHASE'">Compra</option>
+            <option *ngIf="operationMode === 'amount' && isOperationTypeAllowed('PAYMENT')" [ngValue]="'PAYMENT'">Pago a proveedor</option>
+            <option *ngIf="operationMode === 'amount' && isOperationTypeAllowed('CLIENT_PAYMENT')" [ngValue]="'CLIENT_PAYMENT'">Pago de cliente</option>
           </select>
         </div>
         <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
-          <label for="operationAgent">Agente del producto</label>
-			<input type="search" class="form-control product-search" [(ngModel)]="operationAgentSearchTerm" (ngModelChange)="onOperationAgentSearchChange($event)" name="operationAgentSearch" placeholder="Buscar agente de productos">
+          <label for="operationAgent">Proveedor de inventario</label>
+			<input type="search" class="form-control product-search" [(ngModel)]="operationAgentSearchTerm" (ngModelChange)="onOperationAgentSearchChange($event)" name="operationAgentSearch" placeholder="Buscar proveedor">
           <select
             id="operationAgent"
             class="form-control"
@@ -140,14 +147,14 @@
             (ngModelChange)="onOperationAgentChange()"
             name="operationAgent"
           >
-            <option [ngValue]="null" disabled>Selecciona un agente</option>
-            <option *ngFor="let agent of operationAgents; trackBy: trackByAgentId" [ngValue]="agent.id" [disabled]="agent.id === selectedAgentId">{{ agent.name }}</option>
+            <option [ngValue]="null" disabled>Selecciona un proveedor</option>
+            <option *ngFor="let agent of operationAgents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
           </select>
-			<span *ngIf="isLoadingOperationAgents" class="field-note">Buscando agentes…</span>
+			<span *ngIf="isLoadingOperationAgents" class="field-note">Buscando proveedores…</span>
 			<span *ngIf="operationAgentLookupError" class="field-error">{{ operationAgentLookupError }}</span>
 			<button *ngIf="!operationAgentsSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreOperationAgents()" [disabled]="isLoadingOperationAgents">Ver más agentes</button>
-          <span class="field-note">Elige un agente para cada producto. Los productos ya agregados se mantienen en la venta.</span>
-          <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un agente diferente al agente principal.</span>
+          <span class="field-note">Elige el proveedor que posee el inventario.</span>
+          <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un proveedor de inventario válido.</span>
         </div>
         <div class="form-group">
           <label for="operationConcept">Concepto</label>
@@ -178,11 +185,11 @@
           <input type="search" class="form-control product-search" [(ngModel)]="productSearchTerm" (ngModelChange)="onProductSearchChange($event)" name="operationProductSearch" placeholder="Buscar producto" [disabled]="!isInventoryAgentValid()">
           <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct" [disabled]="!isInventoryAgentValid() || isCurrentInventoryLoading() || hasCurrentInventoryLoadError() || !getCurrentProductOptions().length">
             <option [ngValue]="0" disabled>Selecciona un producto</option>
-            <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }}</option>
+            <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }} · Disponible: {{ product.quantity }}</option>
           </select>
           <button *ngIf="!productSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreProducts()" [disabled]="isCurrentInventoryLoading()">Ver más productos</button>
           <span *ngIf="isCurrentInventoryLoading()" class="field-note" aria-live="polite">Cargando productos…</span>
-          <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este agente no tiene productos disponibles.</span>
+          <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este proveedor no tiene productos disponibles.</span>
           <span *ngIf="hasCurrentInventoryLoadError()" class="field-error" role="alert">No se pudieron cargar los productos. <button type="button" class="btn btn-xs btn-outline" (click)="retryProductsLoad()">Reintentar</button></span>
         </div>
         <div *ngIf="operationMode === 'products'" class="form-group">
@@ -208,7 +215,7 @@
       <div *ngIf="operationMode === 'products' && items.length" class="items-list">
         <div class="items-title">Productos agregados</div>
         <div class="items-row" *ngFor="let item of items; trackBy: trackByItemProductId">
-          <div>{{ item.productName }}</div>
+          <div>{{ item.productName }} · Disponible: {{ getProductQuantity(item.productId) }}</div>
           <div class="items-qty">x{{ item.quantity }}</div>
           <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
         </div>

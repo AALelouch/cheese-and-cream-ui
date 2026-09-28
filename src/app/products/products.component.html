@@ -3,7 +3,7 @@
 		<div>
 			<p class="eyebrow">Inventario</p>
 			<h2>Gestion de Productos</h2>
-			<p class="subtitle">Administra tus productos y asignalos a un agente.</p>
+			<p class="subtitle">Administra tus productos y asígnalos a un proveedor.</p>
 		</div>
 		<div class="actions">
 			<button class="btn btn-ghost" (click)="openCategoryModal(categoryModal)">Gestionar Categorias</button>
@@ -13,26 +13,26 @@
 
 	<div class="card">
 		<div class="card-header">
-			<h3>Agentes</h3>
-      <div class="pill">{{ agentsWithProducts.length }} disponibles</div>
+			<h3>Proveedores</h3>
+      <div class="pill">{{ providers.length }} disponibles</div>
 		</div>
 		<div class="search-field">
-			<label for="productsAgentSearch">Buscar agente</label>
+			<label for="productsAgentSearch">Buscar proveedor</label>
 			<input id="productsAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
 		</div>
-		<div *ngIf="isLoadingAgentsWithProducts" class="field-note" aria-live="polite">Buscando agentes…</div>
+		<div *ngIf="isLoadingProviders" class="field-note" aria-live="polite">Buscando proveedores…</div>
 		<div class="agent-buttons">
 			<button
 				type="button"
 				class="btn btn-ghost"
-        *ngFor="let agent of agentsWithProducts; trackBy: trackByAgentId"
+        *ngFor="let agent of providers; trackBy: trackByAgentId"
 				[class.active]="selectedAgentId === agent.id"
 				(click)="selectAgent(agent)"
 			>
 			{{ agent.name }}
 			</button>
-			<button *ngIf="!agentsWithProductsLast" type="button" class="btn btn-outline" (click)="loadAgentsWithProducts()" [disabled]="isLoadingAgentsWithProducts">{{ isLoadingAgentsWithProducts ? 'Cargando…' : 'Ver más agentes' }}</button>
-			<span *ngIf="agentsWithProductsError" class="field-error">{{ agentsWithProductsError }}</span>
+			<button *ngIf="!providersLast" type="button" class="btn btn-outline" (click)="loadProviders()" [disabled]="isLoadingProviders">{{ isLoadingProviders ? 'Cargando…' : 'Ver más proveedores' }}</button>
+			<span *ngIf="providersError" class="field-error">{{ providersError }}</span>
 			<button *ngIf="selectedAgentId" type="button" class="btn btn-outline" (click)="clearAgentFilter()">Limpiar filtro</button>
 		</div>
 	</div>
@@ -43,7 +43,7 @@
 			<div class="pill">{{ totalElements }} items</div>
 		</div>
 		<div *ngIf="selectedAgentId" class="search-field">
-			<label for="productSearch">Buscar productos del agente</label>
+			<label for="productSearch">Buscar productos del proveedor</label>
 			<input id="productSearch" type="search" class="form-control" [(ngModel)]="productSearchTerm" (ngModelChange)="onProductSearchChange($event)" placeholder="Nombre del producto">
 		</div>
 		<div *ngIf="isLoadingProducts" class="empty-state" aria-live="polite"><strong>Buscando productos…</strong></div>
@@ -82,8 +82,8 @@
 			</table>
 		</div>
 		<ng-template #noAgentSelected>
-			<div *ngIf="selectedAgentId && !isLoadingProducts && !productError" class="empty-state" aria-live="polite"><strong>{{ productSearchTerm ? 'No hay productos que coincidan.' : 'Este agente aún no tiene productos.' }}</strong><span>{{ productSearchTerm ? 'Prueba con otro nombre.' : 'Agrega un producto para iniciar su inventario.' }}</span></div>
-			<div *ngIf="!selectedAgentId" class="empty-state" aria-live="polite"><strong>Elige un agente para consultar su inventario.</strong><span>Después podrás agregar, editar o retirar productos de su listado.</span></div>
+			<div *ngIf="selectedAgentId && !isLoadingProducts && !productError" class="empty-state" aria-live="polite"><strong>{{ productSearchTerm ? 'No hay productos que coincidan.' : 'Este proveedor aún no tiene productos.' }}</strong><span>{{ productSearchTerm ? 'Prueba con otro nombre.' : 'Agrega un producto para iniciar su inventario.' }}</span></div>
+			<div *ngIf="!selectedAgentId" class="empty-state" aria-live="polite"><strong>Elige un proveedor para consultar su inventario.</strong><span>Después podrás agregar, editar o retirar productos de su listado.</span></div>
 		</ng-template>
 		<div class="pagination-bar" *ngIf="selectedAgentId && totalElements">
 			<span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
@@ -152,12 +152,13 @@
 					<span *ngIf="isCategoryInvalid()" class="field-error">Selecciona una categoria.</span>
 				</div>
 				<div class="form-group">
-					<label for="productAgent">Agente</label>
+					<label for="productAgent">Proveedor</label>
 					<input
 						type="search"
 						id="productAgentSearch"
 						class="form-control"
 						[(ngModel)]="productFormAgentSearchTerm"
+						(ngModelChange)="loadProvidersForForm($event)"
 						name="productAgentSearch"
 						placeholder="Buscar por nombre, correo o identificación"
 					>
@@ -168,10 +169,10 @@
 						[(ngModel)]="productForm.agendId"
 						name="productAgent"
 					>
-						<option [ngValue]="0" disabled>Selecciona un agente</option>
+						<option [ngValue]="0" disabled>Selecciona un proveedor</option>
 						<option *ngFor="let agent of filteredProductFormAgents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
 					</select>
-					<span *ngIf="isAgentInvalid()" class="field-error">Selecciona un agente.</span>
+					<span *ngIf="isAgentInvalid()" class="field-error">Selecciona un proveedor.</span>
 				</div>
 				<div class="form-actions">
 					<button type="submit" class="btn btn-primary" [disabled]="isSavingProduct">

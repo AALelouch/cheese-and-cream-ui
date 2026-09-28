@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
-import { AgentResponse } from '../agents/agent';
+import { AGENT_ROLE_LABEL, AgentResponse, AgentRole } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { ProductResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
@@ -37,6 +37,7 @@ export class FinancialOperationsComponent implements OnInit {
   operations: FinancialOperationResponse[] = [];
   selectedOperation: FinancialOperationResponse | null = null;
   selectedAgentId: number | null = null;
+  partyRole: AgentRole = 'CLIENT';
   agentSearchTerm = '';
   operationAgentSearchTerm = '';
   operationSearchTerm = '';
@@ -87,6 +88,16 @@ export class FinancialOperationsComponent implements OnInit {
 
   getOperationLabel(type: OperationType): string { return this.operationTypeLabels[type]; }
 
+  getAgentRoleLabel(agent: AgentResponse): string { return AGENT_ROLE_LABEL[agent.role]; }
+
+  isOperationTypeAllowed(type: OperationType): boolean {
+    const agent = this.getSelectedAgent();
+    if (!agent) return true;
+    return agent.role === 'CLIENT'
+      ? type === 'SALE' || type === 'CLIENT_PAYMENT'
+      : type === 'PURCHASE' || type === 'PAYMENT';
+  }
+
   constructor(
     private agentService: AgentService,
     private productService: ProductService,
@@ -100,7 +111,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.agentSearchTerms.pipe(debounceTime(300), distinctUntilChanged(), switchMap(term => {
       this.isLoadingAgents = true;
       this.agentLookupError = '';
-      return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+      return this.getPartyRequest(term, { page: 0, size: 10 }).pipe(catchError(() => {
         this.isLoadingAgents = false;
         this.agentLookupError = 'No se pudieron buscar los agentes.';
         this.cdr.detectChanges();
@@ -157,6 +168,21 @@ export class FinancialOperationsComponent implements OnInit {
     this.agentSearchTerms.next(term);
   }
 
+  onPartyRoleChange(role: AgentRole): void {
+    if (this.partyRole === role) return;
+    this.partyRole = role;
+    this.selectedAgentId = null;
+    this.agents = [];
+    this.agentSearchTerm = '';
+    this.agentsSearchPage = 0;
+    this.agentsSearchLast = true;
+    this.operations = [];
+    this.operationSearchTerm = '';
+    this.pagination = createPaginationState(this.pageSize);
+    this.resetOperationForm();
+    this.loadAgents();
+  }
+
   onOperationAgentSearchChange(term: string): void {
     this.operationAgentSearchTerm = term;
     this.operationAgents = [];
@@ -167,8 +193,17 @@ export class FinancialOperationsComponent implements OnInit {
 
   private getOperationAgentsRequest(term: string, request: { page: number; size: number }) {
     return term
-      ? this.agentService.searchAgentsWithProducts(term, request)
-      : this.agentService.getAgentsWithProducts(request);
+      ? this.agentService.searchProviders(term, request)
+      : this.agentService.getProviders(request);
+  }
+
+  private getPartyRequest(term: string, request: { page: number; size: number }) {
+    if (term.trim()) return this.partyRole === 'CLIENT'
+      ? this.agentService.searchClients(term, request)
+      : this.agentService.searchProviders(term, request);
+    return this.partyRole === 'CLIENT'
+      ? this.agentService.getClients(request)
+      : this.agentService.getProviders(request);
   }
 
   loadMoreOperationAgents(): void {
@@ -193,7 +228,7 @@ export class FinancialOperationsComponent implements OnInit {
   loadMoreAgents(): void {
     if (this.isLoadingAgents || this.agentsSearchLast) return;
     this.isLoadingAgents = true;
-    this.agentService.searchAgents(this.agentSearchTerm, { page: this.agentsSearchPage, size: 10 }).subscribe({
+    this.getPartyRequest(this.agentSearchTerm, { page: this.agentsSearchPage, size: 10 }).subscribe({
       next: data => this.zone.run(() => {
         this.agents = [...this.agents, ...data.content];
         this.agentsSearchPage = data.number + 1;
@@ -210,10 +245,12 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   loadAgents(): void {
-    this.agentService.getAllAgents().subscribe({
+    this.getPartyRequest('', { page: 0, size: 10 }).subscribe({
       next: data => {
         this.zone.run(() => {
           this.agents = data.content;
+          this.agentsSearchPage = data.number + 1;
+          this.agentsSearchLast = data.last;
           this.cdr.detectChanges();
         });
       },
@@ -273,11 +310,15 @@ export class FinancialOperationsComponent implements OnInit {
 
   selectAgent(agent: AgentResponse): void {
     if (this.selectedAgentId === agent.id) return;
+    this.partyRole = agent.role;
     this.selectedAgentId = agent.id;
     this.operationSearchTerm = '';
     this.productSearchTerm = '';
     this.operations = [];
     this.pagination = createPaginationState(this.pageSize);
+    this.operationAgentId = null;
+    this.operationAgents = [];
+    this.ensureOperationTypeForSelectedAgent();
     this.loadOperations(agent.id, 0);
   }
 
@@ -352,7 +393,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationForm = {
       amount: 0,
       concept: '',
-      operationType: 'SALE'
+      operationType: this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE'
     };
     this.operationMode = 'amount';
     this.operationAgentId = null;
@@ -403,6 +444,10 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     this.operationFormSubmitted = true;
+    if (!this.isOperationTypeAllowed(this.operationForm.operationType)) {
+      this.operationFormError = 'El tipo de operación no corresponde al tipo de agente seleccionado.';
+      return;
+    }
     if (!this.operationForm.concept.trim()) {
       this.operationFormError = 'El concepto es obligatorio.';
       return;
@@ -423,8 +468,8 @@ export class FinancialOperationsComponent implements OnInit {
       }
       if (!this.isInventoryAgentValid()) {
         this.operationFormError = this.operationForm.operationType === 'SALE'
-          ? 'Selecciona un agente de productos válido y diferente al agente principal.'
-          : 'Selecciona un agente principal válido.';
+          ? 'Selecciona un proveedor de inventario válido.'
+          : 'Selecciona un proveedor principal válido.';
         return;
       }
       if (!this.items.length) {
@@ -433,6 +478,11 @@ export class FinancialOperationsComponent implements OnInit {
       }
       if (!this.items.every(item => Number.isInteger(item.productId) && this.isValidQuantity(item.quantity))) {
         this.operationFormError = 'Revisa las cantidades de los productos agregados.';
+        return;
+      }
+      const oversold = this.operationForm.operationType === 'SALE' && this.items.find(item => item.quantity > this.getProductQuantity(item.productId));
+      if (oversold) {
+        this.operationFormError = `La cantidad solicitada supera la disponible (${this.getProductQuantity(oversold.productId)}).`;
         return;
       }
       this.operationForm.amount = 0;
@@ -467,6 +517,7 @@ export class FinancialOperationsComponent implements OnInit {
           if (inventoryAgentId) this.invalidateProducts(inventoryAgentId);
           this.selectedAgentId = requestAgentId;
           this.loadOperations(requestAgentId);
+          this.refreshSelectedAgent(requestAgentId);
           this.modalRef?.hide();
           this.resetOperationForm();
           this.cdr.detectChanges();
@@ -508,7 +559,16 @@ export class FinancialOperationsComponent implements OnInit {
       && !this.isCurrentInventoryLoading()
       && !this.hasCurrentInventoryLoadError()
       && this.isCurrentProduct(this.selectedProductId)
-      && this.isValidQuantity(this.selectedProductQuantity);
+      && this.isValidQuantity(this.selectedProductQuantity)
+      && (this.operationForm.operationType !== 'SALE' || this.getRequestedQuantity(this.selectedProductId) + Number(this.selectedProductQuantity) <= this.getProductQuantity(this.selectedProductId));
+  }
+
+  getProductQuantity(productId: number): number {
+    return this.getCurrentProductOptions().find(product => product.id === productId)?.quantity ?? 0;
+  }
+
+  getRequestedQuantity(productId: number): number {
+    return this.items.find(item => item.productId === productId)?.quantity ?? 0;
   }
 
   isAgentSelected(agentId: number): boolean {
@@ -533,7 +593,9 @@ export class FinancialOperationsComponent implements OnInit {
 
   onOperationModeChange(mode: 'amount' | 'products'): void {
     this.operationMode = mode;
-    if (mode === 'products' && !this.isProductOperationType()) this.operationForm.operationType = 'SALE';
+    if (mode === 'products' && !this.isProductOperationType()) {
+      this.operationForm.operationType = this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE';
+    }
     this.operationAgentId = null;
     this.resetProductSelection();
     this.refreshProductsForOperation();
@@ -541,7 +603,7 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   onOperationAgentChange(): void {
-    this.resetProductInput();
+    this.resetProductSelection();
     this.refreshProductsForOperation();
     this.cdr.detectChanges();
   }
@@ -620,6 +682,25 @@ export class FinancialOperationsComponent implements OnInit {
 
   private isProductOperationType(): boolean {
     return this.operationForm.operationType === 'SALE' || this.operationForm.operationType === 'PURCHASE';
+  }
+
+  private getSelectedAgent(): AgentResponse | undefined {
+    return this.agents.find(agent => agent.id === this.selectedAgentId);
+  }
+
+  private ensureOperationTypeForSelectedAgent(): void {
+    if (!this.isOperationTypeAllowed(this.operationForm.operationType)) {
+      this.operationForm.operationType = this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE';
+    }
+  }
+
+  private refreshSelectedAgent(agentId: number): void {
+    this.agentService.getAgent(agentId).subscribe({
+      next: updatedAgent => this.zone.run(() => {
+        this.agents = this.agents.map(agent => agent.id === agentId ? updatedAgent : agent);
+        this.cdr.detectChanges();
+      })
+    });
   }
 
   isInventoryAgentValid(): boolean {

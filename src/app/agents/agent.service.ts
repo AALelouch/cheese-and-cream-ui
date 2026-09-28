@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AgentRequest, AgentResponse } from './agent';
+import { AgentResponse, AgentUpsertRequest } from './agent';
 import { DEFAULT_PAGE_SIZE, PageRequest, PageResponse, toPageParams } from '../shared/pagination';
 import { environment } from '../../environments/environment';
 
@@ -15,27 +15,31 @@ export class AgentService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getAllAgents(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
-    return this.http.get<PageResponse<AgentResponse>>(this.apiUrl, { params: toPageParams(request) });
+  getClients(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.get<PageResponse<AgentResponse>>(`${this.apiUrl}/clients`, { params: toPageParams(request) });
   }
 
-  searchAgents(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
-    return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/search`, { term }, { params: toPageParams(request) });
+  searchClients(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/search/clients`, { term }, { params: toPageParams(request) });
   }
 
-  getAgentsWithProducts(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
-    return this.http.get<PageResponse<AgentResponse>>(`${this.apiUrl}/with-products`, { params: toPageParams(request) });
+  getProviders(request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.get<PageResponse<AgentResponse>>(`${this.apiUrl}/providers`, { params: toPageParams(request) });
   }
 
-  searchAgentsWithProducts(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
-    return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/with-products/search`, { term }, { params: toPageParams(request) });
+  searchProviders(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
+    return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/search/providers`, { term }, { params: toPageParams(request) });
   }
 
-  createAgent(request: AgentRequest): Observable<void> {
+  getAgent(id: number): Observable<AgentResponse> {
+    return this.http.get<AgentResponse>(`${this.apiUrl}/${id}`);
+  }
+
+  createAgent(request: AgentUpsertRequest): Observable<void> {
     return this.http.post<void>(this.apiUrl, request);
   }
 
-  updateAgent(id: number, request: AgentRequest): Observable<void> {
+  updateAgent(id: number, request: AgentUpsertRequest): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/${id}`, request);
   }
 
