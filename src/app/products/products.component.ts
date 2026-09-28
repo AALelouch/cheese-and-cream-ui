@@ -22,7 +22,7 @@ import { removeById, replaceById } from '../shared/collection';
 export class ProductsComponent implements OnInit {
   products: ProductResponse[] = [];
   agents: AgentResponse[] = [];
-  agentsWithProducts: AgentResponse[] = [];
+  providers: AgentResponse[] = [];
   categories: CategoryResponse[] = [];
   selectedAgentId: number | null = null;
   agentSearchTerm = '';
@@ -30,8 +30,8 @@ export class ProductsComponent implements OnInit {
   productFormCategorySearchTerm = '';
   productSearchTerm = '';
   isLoadingProducts = false;
-  isLoadingAgentsWithProducts = false;
-  agentsWithProductsError = '';
+  isLoadingProviders = false;
+  providersError = '';
   modalRef?: BsModalRef;
   isSavingProduct = false;
   productError = '';
@@ -53,8 +53,8 @@ export class ProductsComponent implements OnInit {
   productFormSubmitted = false;
   pagination = createPaginationState();
   private productsRequestId = 0;
-  private agentsWithProductsPage = 0;
-  agentsWithProductsLast = true;
+  private providersPage = 0;
+  providersLast = true;
   private readonly productSearchTerms = new Subject<string>();
   private readonly agentSearchTerms = new Subject<string>();
 
@@ -90,23 +90,23 @@ export class ProductsComponent implements OnInit {
       debounceTime(300),
       distinctUntilChanged(),
       switchMap(term => {
-        this.isLoadingAgentsWithProducts = true;
-        this.agentsWithProductsError = '';
+        this.isLoadingProviders = true;
+        this.providersError = '';
         const request$ = term
-          ? this.agentService.searchAgents(term, { page: 0, size: 10 })
-          : this.agentService.getAgentsWithProducts({ page: 0, size: 10 });
+          ? this.agentService.searchProviders(term, { page: 0, size: 10 })
+          : this.agentService.getProviders({ page: 0, size: 10 });
         return request$.pipe(catchError(() => {
-          this.isLoadingAgentsWithProducts = false;
-          this.agentsWithProductsError = 'No se pudieron cargar los agentes.';
+          this.isLoadingProviders = false;
+          this.providersError = 'No se pudieron cargar los proveedores.';
           this.cdr.detectChanges();
           return EMPTY;
         }));
       })
     ).subscribe(data => this.zone.run(() => {
-      this.agentsWithProducts = data.content;
-      this.agentsWithProductsPage = data.number + 1;
-      this.agentsWithProductsLast = data.last;
-      this.isLoadingAgentsWithProducts = false;
+      this.providers = data.content;
+      this.providersPage = data.number + 1;
+      this.providersLast = data.last;
+      this.isLoadingProviders = false;
       this.cdr.detectChanges();
     }));
     this.onAgentSearchChange('');
@@ -190,9 +190,9 @@ export class ProductsComponent implements OnInit {
 
   onAgentSearchChange(term: string): void {
     this.agentSearchTerm = term;
-    this.agentsWithProducts = [];
-    this.agentsWithProductsPage = 0;
-    this.agentsWithProductsLast = true;
+    this.providers = [];
+    this.providersPage = 0;
+    this.providersLast = true;
     this.agentSearchTerms.next(term);
   }
 
@@ -206,49 +206,45 @@ export class ProductsComponent implements OnInit {
   }
 
   loadAgents(): void {
-    this.loadAllAgents();
+    this.loadProvidersForForm();
   }
 
-  private loadAllAgents(page = 0, collected: AgentResponse[] = []): void {
-    this.agentService.getAllAgents({ page, size: 100 }).subscribe({
+  loadProvidersForForm(term = ''): void {
+    const request$ = term ? this.agentService.searchProviders(term, { page: 0, size: 100 }) : this.agentService.getProviders({ page: 0, size: 100 });
+    request$.subscribe({
       next: data => {
-        const allAgents = [...collected, ...data.content];
-        if (!data.last) {
-          this.loadAllAgents(page + 1, allAgents);
-          return;
-        }
         this.zone.run(() => {
-          this.agents = allAgents;
+          this.agents = data.content;
           this.cdr.detectChanges();
         });
       },
       error: () => {
         this.zone.run(() => {
-          this.productError = 'No se pudieron cargar los agentes.';
+          this.productError = 'No se pudieron cargar los proveedores.';
           this.cdr.detectChanges();
         });
       }
     });
   }
 
-  loadAgentsWithProducts(): void {
-    if (this.isLoadingAgentsWithProducts || this.agentsWithProductsLast && this.agentsWithProducts.length) return;
-    this.isLoadingAgentsWithProducts = true;
-    this.agentsWithProductsError = '';
+  loadProviders(): void {
+    if (this.isLoadingProviders || this.providersLast && this.providers.length) return;
+    this.isLoadingProviders = true;
+    this.providersError = '';
     const request$ = this.agentSearchTerm
-      ? this.agentService.searchAgents(this.agentSearchTerm, { page: this.agentsWithProductsPage, size: 10 })
-      : this.agentService.getAgentsWithProducts({ page: this.agentsWithProductsPage, size: 10 });
+      ? this.agentService.searchProviders(this.agentSearchTerm, { page: this.providersPage, size: 10 })
+      : this.agentService.getProviders({ page: this.providersPage, size: 10 });
     request$.subscribe({
       next: data => this.zone.run(() => {
-        this.agentsWithProducts = [...this.agentsWithProducts, ...data.content];
-        this.agentsWithProductsPage = data.number + 1;
-        this.agentsWithProductsLast = data.last;
-        this.isLoadingAgentsWithProducts = false;
+        this.providers = [...this.providers, ...data.content];
+        this.providersPage = data.number + 1;
+        this.providersLast = data.last;
+        this.isLoadingProviders = false;
         this.cdr.detectChanges();
       }),
       error: () => this.zone.run(() => {
-        this.isLoadingAgentsWithProducts = false;
-        this.agentsWithProductsError = 'No se pudieron cargar los agentes con productos.';
+        this.isLoadingProviders = false;
+        this.providersError = 'No se pudieron cargar los proveedores.';
         this.cdr.detectChanges();
       })
     });
@@ -448,7 +444,7 @@ export class ProductsComponent implements OnInit {
     }
 
     if (!this.productForm.agendId) {
-      this.productError = 'Selecciona un agente.';
+      this.productError = 'Selecciona un proveedor.';
       return;
     }
 

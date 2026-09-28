@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
-import { AgentRequest, AgentResponse } from './agent';
+import { AGENT_ROLE_LABEL, AgentResponse, AgentRole, AgentUpsertRequest } from './agent';
 import { CommonModule } from '@angular/common';
 import { IdentificationTypeService } from './identification-type.service';
 import { IdentificationTypeRequest, IdentificationTypeResponse } from './identification-type';
@@ -9,6 +9,7 @@ import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subjec
 import { AgentService, AGENT_DEFAULT_SORT } from './agent.service';
 import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
 import { removeById, replaceById } from '../shared/collection';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-agents',
@@ -19,6 +20,7 @@ import { removeById, replaceById } from '../shared/collection';
   providers: [IdentificationTypeService]
 })
 export class AgentsComponent implements OnInit {
+  readonly role: AgentRole;
   agents: AgentResponse[] = [];
   identificationTypes: IdentificationTypeResponse[] = [];
   modalRef?: BsModalRef;
@@ -29,13 +31,15 @@ export class AgentsComponent implements OnInit {
   editingIdentificationTypeName = '';
   isSavingAgent = false;
   agentError = '';
-  agentForm: AgentRequest = {
+  agentForm: AgentUpsertRequest = {
     name: '',
     email: '',
     phoneNumber: '',
     address: '',
-    balance: '',
+    receivables: 0,
+    payables: 0,
     identificationTypeId: 0,
+    role: 'CLIENT',
     identificationNumber: ''
   };
   agentFormSubmitted = false;
@@ -52,8 +56,12 @@ export class AgentsComponent implements OnInit {
     private agentService: AgentService,
     private modalService: BsModalService,
     private cdr: ChangeDetectorRef,
-    private zone: NgZone
-  ) { }
+    private zone: NgZone,
+    route: ActivatedRoute
+  ) { this.role = route.snapshot.data['role'] === 'PROVIDER' ? 'PROVIDER' : 'CLIENT'; }
+
+  get sectionLabel(): string { return this.role === 'CLIENT' ? 'Clientes' : 'Proveedores'; }
+  get singularLabel(): string { return this.role === 'CLIENT' ? 'cliente' : 'proveedor'; }
 
   get page(): number { return this.pagination.page; }
   get pageSize(): number { return this.pagination.pageSize; }
@@ -69,7 +77,7 @@ export class AgentsComponent implements OnInit {
       switchMap(term => {
         this.isLoadingAgents = true;
         this.agentsLoadError = '';
-        return this.agentService.searchAgents(term, { page: 0, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).pipe(
+        return this.searchByRole(term, { page: 0, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).pipe(
           catchError(() => {
             this.isLoadingAgents = false;
             this.agentsLoadError = 'No se pudieron cargar los agentes.';
@@ -92,7 +100,7 @@ export class AgentsComponent implements OnInit {
     const requestId = ++this.agentsRequestId;
     this.isLoadingAgents = true;
     this.agentsLoadError = '';
-    this.agentService.searchAgents(this.searchTerm, { page, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).subscribe({
+    this.searchByRole(this.searchTerm, { page, size: this.pageSize, sort: AGENT_DEFAULT_SORT }).subscribe({
       next: data => {
         if (requestId !== this.agentsRequestId) return;
         this.zone.run(() => {
@@ -173,8 +181,10 @@ export class AgentsComponent implements OnInit {
       email: agent.email ?? '',
       phoneNumber: agent.phoneNumber ?? '',
       address: agent.address ?? '',
-      balance: agent.balance?.toString() ?? '',
+      receivables: this.toFiniteNumber(agent.receivables),
+      payables: this.toFiniteNumber(agent.payables),
       identificationTypeId,
+      role: this.role,
       identificationNumber: agent.identificationNumber ?? ''
     };
     this.agentError = '';
@@ -189,8 +199,10 @@ export class AgentsComponent implements OnInit {
       email: '',
       phoneNumber: '',
       address: '',
-      balance: '',
+      receivables: 0,
+      payables: 0,
       identificationTypeId: 0,
+      role: this.role,
       identificationNumber: ''
     };
     this.agentError = '';
@@ -216,13 +228,22 @@ export class AgentsComponent implements OnInit {
       return;
     }
 
+    const receivables = Number(this.agentForm.receivables);
+    const payables = Number(this.agentForm.payables);
+    if (!Number.isFinite(receivables) || !Number.isFinite(payables)) {
+      this.agentError = 'Los saldos deben ser valores numéricos válidos.';
+      return;
+    }
+
     this.isSavingAgent = true;
     this.agentError = '';
 
-    const request: AgentRequest = {
+    const request: AgentUpsertRequest = {
       ...this.agentForm,
       name: trimmedName,
-      balance: this.agentForm.balance?.toString() ?? ''
+      receivables,
+      payables,
+      role: this.role
     };
 
     const request$ = this.editingAgentId
@@ -305,6 +326,28 @@ export class AgentsComponent implements OnInit {
     }
 
     return '';
+  }
+
+  getAgentRoleLabel(role: AgentRole): string {
+    return AGENT_ROLE_LABEL[role];
+  }
+
+  formatMoney(value: string): number {
+    return this.toFiniteNumber(value);
+  }
+
+  private searchByRole(term: string, request: { page: number; size: number; sort: string[] }) {
+    if (term.trim()) return this.role === 'CLIENT'
+      ? this.agentService.searchClients(term, request)
+      : this.agentService.searchProviders(term, request);
+    return this.role === 'CLIENT'
+      ? this.agentService.getClients(request)
+      : this.agentService.getProviders(request);
+  }
+
+  private toFiniteNumber(value: string | number | null | undefined): number {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount : 0;
   }
 
   trackByAgentId(index: number, agent: AgentResponse): number {
