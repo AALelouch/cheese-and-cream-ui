@@ -14,12 +14,13 @@ import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from 
 interface OperationItem {
   productId: number;
   quantity: number;
+  price: number;
   agentId: number;
   productName: string;
 }
 
 interface OperationForm {
-  amount: number;
+  amount: number | null;
   concept: string;
   operationType: OperationType;
 }
@@ -68,6 +69,7 @@ export class FinancialOperationsComponent implements OnInit {
   };
   selectedProductId = 0;
   selectedProductQuantity = 1;
+  selectedProductPrice: number | null = null;
   items: OperationItem[] = [];
   productsLoadErrorAgentId: number | null = null;
   pagination = createPaginationState();
@@ -188,7 +190,30 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationAgents = [];
     this.operationAgentsSearchPage = 0;
     this.operationAgentsSearchLast = true;
+    if (!term.trim()) {
+      this.loadOperationAgents('');
+      return;
+    }
     this.operationAgentSearchTerms.next(term);
+  }
+
+  private loadOperationAgents(term: string): void {
+    this.isLoadingOperationAgents = true;
+    this.operationAgentLookupError = '';
+    this.getOperationAgentsRequest(term, { page: 0, size: 10 }).subscribe({
+      next: data => this.zone.run(() => {
+        this.operationAgents = data.content;
+        this.operationAgentsSearchPage = data.number + 1;
+        this.operationAgentsSearchLast = data.last;
+        this.isLoadingOperationAgents = false;
+        this.cdr.detectChanges();
+      }),
+      error: () => this.zone.run(() => {
+        this.isLoadingOperationAgents = false;
+        this.operationAgentLookupError = 'No se pudieron buscar los agentes de productos.';
+        this.cdr.detectChanges();
+      })
+    });
   }
 
   private getOperationAgentsRequest(term: string, request: { page: number; size: number }) {
@@ -391,7 +416,7 @@ export class FinancialOperationsComponent implements OnInit {
 
   resetOperationForm(): void {
     this.operationForm = {
-      amount: 0,
+      amount: null,
       concept: '',
       operationType: this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE'
     };
@@ -404,6 +429,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationAgentLookupError = '';
     this.selectedProductId = 0;
     this.selectedProductQuantity = 1;
+    this.selectedProductPrice = null;
     this.items = [];
     this.operationFormError = '';
     this.operationFormSubmitted = false;
@@ -425,6 +451,7 @@ export class FinancialOperationsComponent implements OnInit {
       this.items.push({
         productId: this.selectedProductId,
         quantity: this.selectedProductQuantity,
+        price: Number(this.getSelectedProductPrice()),
         agentId: inventoryAgentId,
         productName: product.name
       });
@@ -432,6 +459,7 @@ export class FinancialOperationsComponent implements OnInit {
 
     this.selectedProductId = 0;
     this.selectedProductQuantity = 1;
+    this.selectedProductPrice = null;
   }
 
   removeItem(item: OperationItem): void {
@@ -454,7 +482,7 @@ export class FinancialOperationsComponent implements OnInit {
     }
 
     if (this.operationMode === 'amount') {
-      if (!Number.isFinite(Number(this.operationForm.amount)) || this.operationForm.amount <= 0) {
+      if (!Number.isFinite(Number(this.operationForm.amount)) || Number(this.operationForm.amount) <= 0) {
         this.operationFormError = 'Ingresa un monto mayor a cero.';
         return;
       }
@@ -476,8 +504,8 @@ export class FinancialOperationsComponent implements OnInit {
         this.operationFormError = 'Agrega al menos un producto.';
         return;
       }
-      if (!this.items.every(item => Number.isInteger(item.productId) && this.isValidQuantity(item.quantity))) {
-        this.operationFormError = 'Revisa las cantidades de los productos agregados.';
+      if (!this.items.every(item => Number.isInteger(item.productId) && this.isValidQuantity(item.quantity) && this.isValidUnitPrice(item.price))) {
+        this.operationFormError = 'Revisa las cantidades y precios de los productos agregados.';
         return;
       }
       const oversold = this.operationForm.operationType === 'SALE' && this.items.find(item => item.quantity > this.getProductQuantity(item.productId));
@@ -485,7 +513,10 @@ export class FinancialOperationsComponent implements OnInit {
         this.operationFormError = `La cantidad solicitada supera la disponible (${this.getProductQuantity(oversold.productId)}).`;
         return;
       }
-      this.operationForm.amount = 0;
+      if (!this.isProductAmountValid()) {
+        this.operationFormError = 'El pago inmediato no puede ser negativo.';
+        return;
+      }
     }
 
     const requestAgentId = this.selectedAgentId;
@@ -495,12 +526,14 @@ export class FinancialOperationsComponent implements OnInit {
     this.isSavingOperation = true;
     this.operationFormError = '';
 
-    const productsMap: Record<number, number> = {};
-    this.items.forEach(item => { productsMap[item.productId] = item.quantity; });
+    const productsMap: FinancialOperationRequest['products'] = {};
+    this.items.forEach(item => {
+      productsMap[item.productId] = { quantity: Number(item.quantity), price: Number(item.price) };
+    });
 
     const request: FinancialOperationRequest = {
       idAgent: requestAgentId,
-      amount: this.operationForm.amount,
+      amount: this.operationMode === 'products' ? this.getImmediatePaymentAmount() : Number(this.operationForm.amount),
       concept: this.operationForm.concept.trim(),
       operationType: this.operationForm.operationType,
       products: productsMap
@@ -537,7 +570,11 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   isAmountInvalid(): boolean {
-    return this.operationFormSubmitted && (!Number.isFinite(Number(this.operationForm.amount)) || this.operationForm.amount <= 0);
+    return this.operationFormSubmitted && (!Number.isFinite(Number(this.operationForm.amount)) || Number(this.operationForm.amount) <= 0);
+  }
+
+  isProductAmountInvalid(): boolean {
+    return this.operationFormSubmitted && this.operationMode === 'products' && !this.isProductAmountValid();
   }
 
   isOperationAgentInvalid(): boolean {
@@ -560,6 +597,7 @@ export class FinancialOperationsComponent implements OnInit {
       && !this.hasCurrentInventoryLoadError()
       && this.isCurrentProduct(this.selectedProductId)
       && this.isValidQuantity(this.selectedProductQuantity)
+      && this.isValidUnitPrice(this.getSelectedProductPrice())
       && (this.operationForm.operationType !== 'SALE' || this.getRequestedQuantity(this.selectedProductId) + Number(this.selectedProductQuantity) <= this.getProductQuantity(this.selectedProductId));
   }
 
@@ -569,6 +607,14 @@ export class FinancialOperationsComponent implements OnInit {
 
   getRequestedQuantity(productId: number): number {
     return this.items.find(item => item.productId === productId)?.quantity ?? 0;
+  }
+
+  getLineTotal(item: OperationItem): number {
+    return Number(item.quantity) * Number(item.price);
+  }
+
+  getItemsTotal(): number {
+    return this.items.reduce((total, item) => total + this.getLineTotal(item), 0);
   }
 
   isAgentSelected(agentId: number): boolean {
@@ -606,6 +652,10 @@ export class FinancialOperationsComponent implements OnInit {
     this.resetProductSelection();
     this.refreshProductsForOperation();
     this.cdr.detectChanges();
+  }
+
+  onSelectedProductChange(): void {
+    this.selectedProductPrice = null;
   }
 
   onProductSearchChange(term: string): void {
@@ -676,6 +726,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.selectedProductId = 0;
     this.productSearchTerm = '';
     this.selectedProductQuantity = 1;
+    this.selectedProductPrice = null;
     this.productSearchPage = 0;
     this.productSearchLast = true;
   }
@@ -719,6 +770,25 @@ export class FinancialOperationsComponent implements OnInit {
 
   private isValidQuantity(quantity: number): boolean {
     return Number.isFinite(Number(quantity)) && Number.isInteger(Number(quantity)) && Number(quantity) > 0;
+  }
+
+  private isValidUnitPrice(price: number | null): boolean {
+    return price !== null && Number.isFinite(Number(price)) && Number(price) >= 0;
+  }
+
+  private getSelectedProductPrice(): number | null {
+    return this.selectedProductPrice;
+  }
+
+  private isProductAmountValid(): boolean {
+    return this.operationForm.amount === null
+      || (Number.isFinite(Number(this.operationForm.amount)) && Number(this.operationForm.amount) >= 0);
+  }
+
+  private getImmediatePaymentAmount(): number {
+    return this.operationForm.amount === null
+      ? 0
+      : Number(this.operationForm.amount);
   }
 
   trackByAgentId(index: number, agent: AgentResponse): number {

@@ -7,11 +7,16 @@ export const OPERATION_TYPE_LABELS: Record<OperationType, string> = {
   CLIENT_PAYMENT: 'Pago a cliente'
 };
 
+export interface FinancialOperationProductRequest {
+  quantity: number;
+  price: number;
+}
+
 export interface FinancialOperationRequest {
-  products: Record<number, number>;
+  products: Record<number, FinancialOperationProductRequest>;
   idAgent: number;
   amount: number;
-  concept: string;
+  concept?: string;
   operationType: OperationType;
 }
 
@@ -22,8 +27,7 @@ export interface FinancialOperationResponse {
     name: string;
     quantity: number;
     price: number;
-    unitPrice: number;
-    unitType: string;
+    totalPrice: number;
   }>;
   idAgent: number;
   concept: string;
