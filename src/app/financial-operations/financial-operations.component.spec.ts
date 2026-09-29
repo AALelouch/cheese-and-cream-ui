@@ -11,22 +11,23 @@ import { FinancialOperationService } from './financial-operation.service';
 import { FinancialOperationsComponent } from './financial-operations.component';
 
 const agents: AgentResponse[] = [
-  { id: 1, name: 'Principal', email: '', phoneNumber: '', address: '', balance: 0, identificationType: '', identificationNumber: '' },
-  { id: 2, name: 'Inventario', email: '', phoneNumber: '', address: '', balance: 0, identificationType: '', identificationNumber: '' },
-  { id: 3, name: 'Otro inventario', email: '', phoneNumber: '', address: '', balance: 0, identificationType: '', identificationNumber: '' }
+  { id: 1, name: 'Principal', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'CLIENT', identificationType: '', identificationNumber: '' },
+  { id: 2, name: 'Inventario', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'PROVIDER', identificationType: '', identificationNumber: '' },
+  { id: 3, name: 'Otro inventario', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'PROVIDER', identificationType: '', identificationNumber: '' }
 ];
-const product = (id: number, name = `Producto ${id}`): ProductResponse => ({ id, name, quantity: 3, price: 10, cost: 5, unitType: 'Unidad', categoryName: 'Queso', agentName: '' });
-const operationItem = (productId: number, quantity: number, agentId = 2, productName = `Producto ${productId}`) => ({ productId, quantity, agentId, productName });
+const product = (id: number, name = `Producto ${id}`): ProductResponse => ({ id, name, quantity: 3, cost: 5, unitType: 'Unidad', categoryName: 'Queso', agentName: '' });
+const operationItem = (productId: number, quantity: number, agentId = 2, productName = `Producto ${productId}`, price = 10) => ({ productId, quantity, price, agentId, productName });
 const page = <T>(content: T[]) => ({ content, totalElements: content.length, totalPages: 1, size: 10, number: 0, numberOfElements: content.length, first: true, last: true, empty: !content.length });
 
 describe('FinancialOperationsComponent', () => {
   let component: FinancialOperationsComponent;
   let fixture: ComponentFixture<FinancialOperationsComponent>;
   let agentService: {
-    getAllAgents: ReturnType<typeof vi.fn>;
-    searchAgents: ReturnType<typeof vi.fn>;
-    getAgentsWithProducts: ReturnType<typeof vi.fn>;
-    searchAgentsWithProducts: ReturnType<typeof vi.fn>;
+    getClients: ReturnType<typeof vi.fn>;
+    searchClients: ReturnType<typeof vi.fn>;
+    getProviders: ReturnType<typeof vi.fn>;
+    searchProviders: ReturnType<typeof vi.fn>;
+    getAgent: ReturnType<typeof vi.fn>;
   };
   let productService: { getProductsByAgentId: ReturnType<typeof vi.fn> };
   let financialOperationService: { getByAgentId: ReturnType<typeof vi.fn>; createOperation: ReturnType<typeof vi.fn> };
@@ -34,10 +35,11 @@ describe('FinancialOperationsComponent', () => {
 
   beforeEach(async () => {
     agentService = {
-      getAllAgents: vi.fn(() => of(page(agents))),
-      searchAgents: vi.fn(() => of(page([]))),
-      getAgentsWithProducts: vi.fn(() => of(page([]))),
-      searchAgentsWithProducts: vi.fn(() => of(page([])))
+      getClients: vi.fn(() => of(page([agents[0]]))),
+      searchClients: vi.fn(() => of(page([]))),
+      getProviders: vi.fn(() => of(page(agents.slice(1)))),
+      searchProviders: vi.fn(() => of(page([])))
+      , getAgent: vi.fn((id: number) => of(agents.find(agent => agent.id === id)!))
     };
     productService = { getProductsByAgentId: vi.fn(() => of(page([]))) };
     financialOperationService = { getByAgentId: vi.fn(() => of(page([]))), createOperation: vi.fn(() => of(void 0)) };
@@ -64,10 +66,10 @@ describe('FinancialOperationsComponent', () => {
   }
 
   it('loads general agents on init and reports an agents error', async () => {
-    expect(component.agents).toEqual(agents);
-    expect(agentService.getAllAgents).toHaveBeenCalledTimes(1);
+    expect(component.agents).toEqual([agents[0]]);
+    expect(agentService.getClients).toHaveBeenCalledTimes(1);
 
-    agentService.getAllAgents.mockReturnValue(throwError(() => new Error('offline')));
+    agentService.getClients.mockReturnValue(throwError(() => new Error('offline')));
     const anotherFixture = TestBed.createComponent(FinancialOperationsComponent);
     anotherFixture.detectChanges();
     anotherFixture.componentInstance.loadAgents();
@@ -89,20 +91,20 @@ describe('FinancialOperationsComponent', () => {
     component.operationForm.concept = 'Venta';
     component.items = [operationItem(2, 1)];
     component.saveOperation();
-    expect(component.operationFormError).toContain('diferente');
+    expect(component.operationFormError).toContain('proveedor');
   });
 
   it('uses only agents with products when searching the inventory agent for a sale', () => {
     component.operationAgentsSearchLast = false;
     component.operationAgentSearchTerm = '';
     component.loadMoreOperationAgents();
-    expect(agentService.getAgentsWithProducts).toHaveBeenCalledWith({ page: 0, size: 10 });
-    expect(agentService.searchAgents).not.toHaveBeenCalled();
+    expect(agentService.getProviders).toHaveBeenCalledWith({ page: 0, size: 10 });
+    expect(agentService.searchClients).not.toHaveBeenCalled();
 
     component.operationAgentsSearchLast = false;
     component.operationAgentSearchTerm = 'inventario';
     component.loadMoreOperationAgents();
-    expect(agentService.searchAgentsWithProducts).toHaveBeenCalledWith('inventario', { page: 1, size: 10 });
+    expect(agentService.searchProviders).toHaveBeenCalledWith('inventario', { page: 1, size: 10 });
   });
 
   it('loads and searches only inventory agents when the sale-with-products modal opens', async () => {
@@ -110,12 +112,12 @@ describe('FinancialOperationsComponent', () => {
     try {
       openForProducts();
       await vi.advanceTimersByTimeAsync(300);
-      expect(agentService.getAgentsWithProducts).toHaveBeenCalledWith({ page: 0, size: 10 });
+      expect(agentService.getProviders).toHaveBeenCalledWith({ page: 0, size: 10 });
 
       component.onOperationAgentSearchChange('proveedor');
       await vi.advanceTimersByTimeAsync(300);
-      expect(agentService.searchAgentsWithProducts).toHaveBeenCalledWith('proveedor', { page: 0, size: 10 });
-      expect(agentService.searchAgents).not.toHaveBeenCalled();
+      expect(agentService.searchProviders).toHaveBeenCalledWith('proveedor', { page: 0, size: 10 });
+      expect(agentService.searchClients).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -123,20 +125,21 @@ describe('FinancialOperationsComponent', () => {
 
   it('uses the main agent inventory for PURCHASE and never sends operationAgentId as idAgent', () => {
     openForProducts();
+    component.selectedAgentId = 2;
     component.operationForm.operationType = 'PURCHASE';
     component.onOperationTypeChange();
     expect(component.operationAgentId).toBeNull();
-    expect(productService.getProductsByAgentId).toHaveBeenCalledWith(1);
+    expect(productService.getProductsByAgentId).toHaveBeenCalledWith(2);
 
-    component.productsByAgent = { 1: [product(10)] };
-    component.items = [operationItem(10, 2, 1)];
+    component.productsByAgent = { 2: [product(10)] };
+    component.items = [operationItem(10, 2, 2)];
     component.operationForm.concept = 'Compra';
     component.saveOperation();
     expect(financialOperationService.createOperation).toHaveBeenCalledWith(expect.objectContaining({
-      idAgent: 1,
+      idAgent: 2,
       operationType: 'PURCHASE',
       amount: 0,
-      products: { 10: 2 }
+      products: { 10: { quantity: 2, price: 10 } }
     }));
   });
 
@@ -153,8 +156,37 @@ describe('FinancialOperationsComponent', () => {
       idAgent: 1,
       operationType: 'SALE',
       amount: 0,
-      products: { 20: 2 }
+      products: { 20: { quantity: 2, price: 10 } }
     }));
+  });
+
+  it('submits each product line price and normalizes an empty immediate payment to zero', () => {
+    openForProducts();
+    component.operationAgentId = 2;
+    component.productsByAgent = { 2: [product(20)] };
+    component.items = [operationItem(20, 2, 2, 'Producto 20', 14.5)];
+    component.operationForm.amount = null;
+    component.operationForm.concept = 'Venta acordada';
+
+    component.saveOperation();
+
+    expect(financialOperationService.createOperation).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 0,
+      products: { 20: { quantity: 2, price: 14.5 } }
+    }));
+  });
+
+  it('keeps a non-zero immediate payment without comparing it to the calculated product total', () => {
+    openForProducts();
+    component.operationAgentId = 2;
+    component.productsByAgent = { 2: [product(20)] };
+    component.items = [operationItem(20, 1, 2, 'Producto 20', 10)];
+    component.operationForm.amount = 25;
+    component.operationForm.concept = 'Venta con pago inmediato';
+
+    component.saveOperation();
+
+    expect(financialOperationService.createOperation).toHaveBeenCalledWith(expect.objectContaining({ amount: 25 }));
   });
 
   it('resets the product input while retaining added items when changing inventory agent', () => {
@@ -166,7 +198,7 @@ describe('FinancialOperationsComponent', () => {
     component.onOperationAgentChange();
     expect(component.selectedProductId).toBe(0);
     expect(component.selectedProductQuantity).toBe(1);
-    expect(component.items).toEqual([operationItem(10, 4)]);
+    expect(component.items).toEqual([]);
 
     component.selectedProductQuantity = 3;
     component.items = [operationItem(10, 1)];
@@ -186,20 +218,23 @@ describe('FinancialOperationsComponent', () => {
 
     component.selectedProductId = 20;
     component.selectedProductQuantity = 1.5;
+    component.selectedProductPrice = 10;
     component.addItem();
     expect(component.items).toEqual([]);
 
     component.selectedProductQuantity = 2;
+    component.selectedProductPrice = 10;
     component.addItem();
     component.selectedProductId = 20;
     component.selectedProductQuantity = 3;
+    component.selectedProductPrice = 10;
     component.addItem();
-    expect(component.items).toEqual([operationItem(20, 5)]);
+    expect(component.items).toEqual([operationItem(20, 2)]);
 
     component.items = [operationItem(20, Number.NaN)];
     component.operationForm.concept = 'Venta';
     component.saveOperation();
-    expect(component.operationFormError).toContain('cantidades de los productos');
+    expect(component.operationFormError).toContain('cantidades y precios');
   });
 
   it('caches successes, retries failures, and keeps delayed results out of the active selector', () => {
@@ -270,6 +305,7 @@ describe('FinancialOperationsComponent', () => {
     component.operationAgentId = 2;
     component.productsByAgent = { 2: [product(20)] };
     component.selectedProductId = 20;
+    component.selectedProductPrice = 10;
     expect(component.canAddItem()).toBe(true);
   });
 });

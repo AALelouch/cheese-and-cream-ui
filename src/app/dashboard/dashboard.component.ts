@@ -48,7 +48,7 @@ export class DashboardComponent implements OnInit {
       switchMap(term => {
         this.isSearchingAgents.set(true);
         this.agentSearchError.set('');
-        return this.agentService.searchAgents(term, { page: 0, size: 10 }).pipe(catchError(() => {
+        return (term ? this.agentService.searchClients(term, { page: 0, size: 10 }) : this.agentService.getClients({ page: 0, size: 10 })).pipe(catchError(() => {
           this.isSearchingAgents.set(false);
           this.agentSearchError.set('No se pudieron buscar los agentes.');
           return EMPTY;
@@ -98,7 +98,9 @@ export class DashboardComponent implements OnInit {
   loadMoreAgents(): void {
     if (this.isSearchingAgents() || this.agentsSearchLast()) return;
     this.isSearchingAgents.set(true);
-    this.agentService.searchAgents(this.agentSearchTerm(), { page: this.agentsSearchPage(), size: 10 }).subscribe({
+    (this.agentSearchTerm()
+      ? this.agentService.searchClients(this.agentSearchTerm(), { page: this.agentsSearchPage(), size: 10 })
+      : this.agentService.getClients({ page: this.agentsSearchPage(), size: 10 })).subscribe({
       next: data => {
         this.agents.update(agents => [...agents, ...data.content]);
         this.agentsSearchPage.set(data.number + 1);

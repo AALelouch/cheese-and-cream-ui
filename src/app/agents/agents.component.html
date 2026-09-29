@@ -2,12 +2,12 @@
   <div class="page-header">
     <div>
       <p class="eyebrow">CRM</p>
-      <h2>Gestion de Agentes</h2>
-      <p class="subtitle">Administra clientes, identificaciones y balance desde un solo lugar.</p>
+      <h2>Gestión de {{ sectionLabel }}</h2>
+      <p class="subtitle">Administra {{ singularLabel }}s, identificaciones y saldos.</p>
     </div>
     <div class="actions">
       <button class="btn btn-ghost" (click)="openModal(identityTypeModal)">Gestionar Tipos de ID</button>
-      <button class="btn btn-primary" (click)="openAgentModal(agentModal)">Agregar Agente</button>
+      <button class="btn btn-primary" (click)="openAgentModal(agentModal)">Agregar {{ singularLabel }}</button>
     </div>
   </div>
 
@@ -17,10 +17,10 @@
       <div class="pill">{{ totalElements }} activos</div>
     </div>
     <div class="search-field">
-      <label for="agentSearch">Buscar agentes</label>
+      <label for="agentSearch">Buscar {{ sectionLabel | lowercase }}</label>
       <input id="agentSearch" type="search" class="form-control" [(ngModel)]="searchTerm" (ngModelChange)="onSearchTermChange($event)" placeholder="Nombre, correo, dirección o identificación">
     </div>
-    <div *ngIf="isLoadingAgents" class="empty-state" aria-live="polite"><strong>Buscando agentes…</strong></div>
+    <div *ngIf="isLoadingAgents" class="empty-state" aria-live="polite"><strong>Buscando {{ sectionLabel | lowercase }}…</strong></div>
     <div *ngIf="agentsLoadError" class="inline-alert" role="alert">{{ agentsLoadError }}</div>
     <div class="table-wrap" *ngIf="!isLoadingAgents && !agentsLoadError && agents.length; else noAgents">
       <table class="table">
@@ -31,7 +31,9 @@
         <th>Email</th>
         <th>Teléfono</th>
         <th>Dirección</th>
-        <th>Balance</th>
+        <th>Por cobrar</th>
+        <th>Por pagar</th>
+        <th>Saldo neto</th>
         <th>Tipo de ID</th>
         <th>Número de ID</th>
         <th>Acciones</th>
@@ -44,7 +46,9 @@
         <td>{{ agent.email }}</td>
         <td>{{ agent.phoneNumber }}</td>
         <td>{{ agent.address }}</td>
-        <td class="amount">{{ agent.balance | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+        <td class="amount">{{ formatMoney(agent.receivables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+        <td class="amount">{{ formatMoney(agent.payables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+        <td class="amount">{{ formatMoney(agent.balance) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
         <td>{{ getAgentIdentificationType(agent) }}</td>
         <td>{{ agent.identificationNumber }}</td>
         <td>
@@ -58,7 +62,7 @@
       </table>
     </div>
     <ng-template #noAgents>
-      <div *ngIf="!isLoadingAgents && !agentsLoadError" class="empty-state" aria-live="polite"><strong>{{ searchTerm ? 'No encontramos agentes con esa búsqueda.' : 'Aún no hay agentes registrados.' }}</strong><span>{{ searchTerm ? 'Prueba con otro nombre, correo, dirección o identificación.' : 'Agrega el primer agente para empezar a organizar clientes y saldos.' }}</span></div>
+      <div *ngIf="!isLoadingAgents && !agentsLoadError" class="empty-state" aria-live="polite"><strong>{{ searchTerm ? 'No encontramos resultados con esa búsqueda.' : 'Aún no hay registros.' }}</strong><span>{{ searchTerm ? 'Prueba con otro nombre, correo, dirección o identificación.' : 'Agrega el primer registro para empezar.' }}</span></div>
     </ng-template>
     <div class="pagination-bar" *ngIf="totalElements">
       <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
@@ -70,7 +74,7 @@
   <!-- Modal para crear agente -->
   <ng-template #agentModal>
     <div class="modal-header">
-      <h4 class="modal-title pull-left">{{ editingAgentId ? 'Editar Agente' : 'Agregar Agente' }}</h4>
+      <h4 class="modal-title pull-left">{{ editingAgentId ? 'Editar ' + singularLabel : 'Agregar ' + singularLabel }}</h4>
       <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
         <span aria-hidden="true">&times;</span>
       </button>
@@ -101,9 +105,13 @@
           <label for="address">Direccion</label>
           <input type="text" id="address" class="form-control" [(ngModel)]="agentForm.address" name="address">
         </div>
-        <div class="form-group">
-          <label for="balance">Balance</label>
-          <input type="number" id="balance" class="form-control" [(ngModel)]="agentForm.balance" name="balance">
+        <div *ngIf="role === 'CLIENT'" class="form-group">
+          <label for="receivables">Cuentas por cobrar</label>
+          <input type="number" id="receivables" class="form-control" [(ngModel)]="agentForm.receivables" name="receivables">
+        </div>
+        <div *ngIf="role === 'PROVIDER'" class="form-group">
+          <label for="payables">Cuentas por pagar</label>
+          <input type="number" id="payables" class="form-control" [(ngModel)]="agentForm.payables" name="payables">
         </div>
         <div class="form-group">
           <label for="identificationType">Tipo de Identificacion</label>

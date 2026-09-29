@@ -9,17 +9,17 @@ import { ProductService } from './product.service';
 import { ProductsComponent } from './products.component';
 
 const page = <T>(content: T[], number = 0, last = true) => ({ content, number, last, totalElements: content.length, totalPages: 1, size: 10, numberOfElements: content.length, first: number === 0, empty: !content.length });
-const agent = { id: 7, name: 'Distribuidor', email: '', phoneNumber: '', address: '', balance: 0, identificationType: '', identificationNumber: '' };
+const agent = { id: 7, name: 'Distribuidor', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'PROVIDER' as const, identificationType: '', identificationNumber: '' };
 
 describe('ProductsComponent', () => {
   let component: ProductsComponent;
   let products: { getProductsByAgentId: ReturnType<typeof vi.fn>; searchProducts: ReturnType<typeof vi.fn>; createProduct: ReturnType<typeof vi.fn>; updateProduct: ReturnType<typeof vi.fn>; deleteProduct: ReturnType<typeof vi.fn> };
-  let agents: { getAllAgents: ReturnType<typeof vi.fn>; getAgentsWithProducts: ReturnType<typeof vi.fn>; searchAgents: ReturnType<typeof vi.fn> };
+  let agents: { getProviders: ReturnType<typeof vi.fn>; searchProviders: ReturnType<typeof vi.fn> };
   let categories: { getAllCategories: ReturnType<typeof vi.fn>; createCategory: ReturnType<typeof vi.fn>; updateCategory: ReturnType<typeof vi.fn>; deleteCategory: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     products = { getProductsByAgentId: vi.fn(() => of(page([]))), searchProducts: vi.fn(() => of(page([]))), createProduct: vi.fn(() => of(void 0)), updateProduct: vi.fn(() => of(void 0)), deleteProduct: vi.fn(() => of(void 0)) };
-    agents = { getAllAgents: vi.fn(() => of(page([]))), getAgentsWithProducts: vi.fn(() => of(page([]))), searchAgents: vi.fn(() => of(page([]))) };
+    agents = { getProviders: vi.fn(() => of(page([]))), searchProviders: vi.fn(() => of(page([]))) };
     categories = { getAllCategories: vi.fn(() => of([])), createCategory: vi.fn(() => of(void 0)), updateCategory: vi.fn(() => of(void 0)), deleteCategory: vi.fn(() => of(void 0)) };
     await TestBed.configureTestingModule({ imports: [ProductsComponent], providers: [
       { provide: ProductService, useValue: products }, { provide: AgentService, useValue: agents }, { provide: CategoryService, useValue: categories },
@@ -34,12 +34,12 @@ describe('ProductsComponent', () => {
     expect(component.productError).toBe('El nombre es obligatorio.');
     component.productForm.name = 'Crema';
     component.saveProduct();
-    expect(component.productError).toBe('Selecciona un agente.');
+    expect(component.productError).toBe('Selecciona un proveedor.');
     expect(products.createProduct).not.toHaveBeenCalled();
   });
 
   it('trims product names and reloads the owner inventory after creation', () => {
-    component.productForm = { name: '  Queso costeño ', quantity: 2, price: 8, cost: 4, unitType: 'kg', categoryId: 3, agendId: 7 };
+    component.productForm = { name: '  Queso costeño ', quantity: 2, cost: 4, unitType: 'kg', categoryId: 3, agendId: 7 };
     component.saveProduct();
 
     expect(products.createProduct).toHaveBeenCalledWith(expect.objectContaining({ name: 'Queso costeño', agendId: 7 }));
@@ -59,12 +59,11 @@ describe('ProductsComponent', () => {
     expect(component.products).toEqual([{ id: 2 }]);
   });
 
-  it('loads every page when preparing agents for the product form', () => {
-    agents.getAllAgents.mockImplementation(({ page: requestedPage }: { page: number }) => of(requestedPage === 0 ? page([agent], 0, false) : page([{ ...agent, id: 8 }], 1, true)));
+  it('uses provider lookup when preparing the product form', () => {
+    agents.getProviders.mockReturnValue(of(page([agent])));
     component.loadAgents();
 
-    expect(component.agents.map(item => item.id)).toEqual([7, 8]);
-    expect(agents.getAllAgents).toHaveBeenCalledTimes(2);
+    expect(agents.getProviders).toHaveBeenCalledWith({ page: 0, size: 100 });
   });
 
   it('filters product-form agents by name, email, or identification without changing the selected value', () => {

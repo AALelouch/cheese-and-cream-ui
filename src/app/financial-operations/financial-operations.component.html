@@ -3,7 +3,7 @@
     <div>
       <p class="eyebrow">Operaciones</p>
       <h2>Operaciones Financieras</h2>
-      <p class="subtitle">Selecciona un agente para ver sus operaciones.</p>
+      <p class="subtitle">Selecciona un cliente o proveedor para ver sus operaciones.</p>
     </div>
     <div class="actions">
       <button class="btn btn-primary" (click)="openOperationModal(operationModal)">Crear Operacion</button>
@@ -11,12 +11,18 @@
   </div>
 
   <div class="card">
-    <div class="card-header"><h3>Buscar agente</h3><div class="pill">{{ agents.length }} resultados</div></div>
+    <div class="card-header"><h3>Agentes</h3><div class="pill">{{ agents.length }} resultados</div></div>
     <div class="search-field">
-      <label for="operationAgentSearch">Agente</label>
-      <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+      <div class="agent-search-controls">
+        <div class="party-role-toggle" aria-label="Mostrar agentes">
+          <button type="button" class="party-role-option" [class.active]="partyRole === 'CLIENT'" [attr.aria-pressed]="partyRole === 'CLIENT'" (click)="onPartyRoleChange('CLIENT')">Clientes</button>
+          <button type="button" class="party-role-option" [class.active]="partyRole === 'PROVIDER'" [attr.aria-pressed]="partyRole === 'PROVIDER'" (click)="onPartyRoleChange('PROVIDER')">Proveedores</button>
+        </div>
+        <label class="visually-hidden" for="operationAgentSearch">Buscar agentes</label>
+        <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+      </div>
     </div>
-    <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando agentes…</div>
+    <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando {{ partyRole === 'CLIENT' ? 'clientes' : 'proveedores' }}…</div>
     <div *ngIf="agentLookupError" class="inline-alert" role="alert">{{ agentLookupError }}</div>
     <div class="agent-buttons">
       <button
@@ -123,15 +129,15 @@
             (ngModelChange)="onOperationTypeChange()"
             name="operationType"
           >
-            <option [ngValue]="'SALE'">Venta</option>
-            <option [ngValue]="'PURCHASE'">Compra</option>
-            <option *ngIf="operationMode === 'amount'" [ngValue]="'PAYMENT'">Pago a Proveedor</option>
-            <option *ngIf="operationMode === 'amount'" [ngValue]="'CLIENT_PAYMENT'">Pago a Cliente</option>
+            <option *ngIf="isOperationTypeAllowed('SALE')" [ngValue]="'SALE'">Venta</option>
+            <option *ngIf="isOperationTypeAllowed('PURCHASE')" [ngValue]="'PURCHASE'">Compra</option>
+            <option *ngIf="operationMode === 'amount' && isOperationTypeAllowed('PAYMENT')" [ngValue]="'PAYMENT'">Pago a proveedor</option>
+            <option *ngIf="operationMode === 'amount' && isOperationTypeAllowed('CLIENT_PAYMENT')" [ngValue]="'CLIENT_PAYMENT'">Pago de cliente</option>
           </select>
         </div>
         <div *ngIf="operationMode === 'products' && operationForm.operationType === 'SALE'" class="form-group form-full">
-          <label for="operationAgent">Agente del producto</label>
-			<input type="search" class="form-control product-search" [(ngModel)]="operationAgentSearchTerm" (ngModelChange)="onOperationAgentSearchChange($event)" name="operationAgentSearch" placeholder="Buscar agente de productos">
+          <label for="operationAgent">Proveedor de inventario</label>
+			<input type="search" class="form-control product-search" [(ngModel)]="operationAgentSearchTerm" (ngModelChange)="onOperationAgentSearchChange($event)" name="operationAgentSearch" placeholder="Buscar proveedor">
           <select
             id="operationAgent"
             class="form-control"
@@ -140,14 +146,14 @@
             (ngModelChange)="onOperationAgentChange()"
             name="operationAgent"
           >
-            <option [ngValue]="null" disabled>Selecciona un agente</option>
-            <option *ngFor="let agent of operationAgents; trackBy: trackByAgentId" [ngValue]="agent.id" [disabled]="agent.id === selectedAgentId">{{ agent.name }}</option>
+            <option [ngValue]="null" disabled>Selecciona un proveedor</option>
+            <option *ngFor="let agent of operationAgents; trackBy: trackByAgentId" [ngValue]="agent.id">{{ agent.name }}</option>
           </select>
-			<span *ngIf="isLoadingOperationAgents" class="field-note">Buscando agentes…</span>
+			<span *ngIf="isLoadingOperationAgents" class="field-note">Buscando proveedores…</span>
 			<span *ngIf="operationAgentLookupError" class="field-error">{{ operationAgentLookupError }}</span>
 			<button *ngIf="!operationAgentsSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreOperationAgents()" [disabled]="isLoadingOperationAgents">Ver más agentes</button>
-          <span class="field-note">Elige un agente para cada producto. Los productos ya agregados se mantienen en la venta.</span>
-          <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un agente diferente al agente principal.</span>
+          <span class="field-note">Elige el proveedor que posee el inventario.</span>
+          <span *ngIf="isOperationAgentInvalid()" class="field-error" role="alert">Elige un proveedor de inventario válido.</span>
         </div>
         <div class="form-group">
           <label for="operationConcept">Concepto</label>
@@ -176,18 +182,29 @@
         <div *ngIf="operationMode === 'products'" class="form-group">
           <label for="operationProduct">Producto</label>
           <input type="search" class="form-control product-search" [(ngModel)]="productSearchTerm" (ngModelChange)="onProductSearchChange($event)" name="operationProductSearch" placeholder="Buscar producto" [disabled]="!isInventoryAgentValid()">
-          <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" name="operationProduct" [disabled]="!isInventoryAgentValid() || isCurrentInventoryLoading() || hasCurrentInventoryLoadError() || !getCurrentProductOptions().length">
+          <select id="operationProduct" class="form-control" [(ngModel)]="selectedProductId" (ngModelChange)="onSelectedProductChange()" name="operationProduct" [disabled]="!isInventoryAgentValid() || isCurrentInventoryLoading() || hasCurrentInventoryLoadError() || !getCurrentProductOptions().length">
             <option [ngValue]="0" disabled>Selecciona un producto</option>
-            <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }}</option>
+            <option *ngFor="let product of getCurrentProductOptions(); trackBy: trackByProductId" [ngValue]="product.id">{{ product.name }} · Disponible: {{ product.quantity }}</option>
           </select>
           <button *ngIf="!productSearchLast" type="button" class="btn btn-xs btn-outline more-products" (click)="loadMoreProducts()" [disabled]="isCurrentInventoryLoading()">Ver más productos</button>
           <span *ngIf="isCurrentInventoryLoading()" class="field-note" aria-live="polite">Cargando productos…</span>
-          <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este agente no tiene productos disponibles.</span>
+          <span *ngIf="!isCurrentInventoryLoading() && isInventoryAgentValid() && !hasCurrentInventoryLoadError() && !getCurrentProductOptions().length" class="field-note" aria-live="polite">Este proveedor no tiene productos disponibles.</span>
           <span *ngIf="hasCurrentInventoryLoadError()" class="field-error" role="alert">No se pudieron cargar los productos. <button type="button" class="btn btn-xs btn-outline" (click)="retryProductsLoad()">Reintentar</button></span>
         </div>
         <div *ngIf="operationMode === 'products'" class="form-group">
           <label for="operationQuantity">Cantidad</label>
           <input type="number" id="operationQuantity" class="form-control" [(ngModel)]="selectedProductQuantity" name="operationQuantity">
+        </div>
+        <div *ngIf="operationMode === 'products'" class="form-group">
+          <label for="operationUnitPrice">Precio unitario</label>
+          <input type="number" id="operationUnitPrice" class="form-control" [(ngModel)]="selectedProductPrice" name="operationUnitPrice" min="0" step="any" [disabled]="!isInventoryAgentValid()">
+          <span class="field-note">Puedes ajustarlo para este agente y esta operación.</span>
+        </div>
+        <div *ngIf="operationMode === 'products'" class="form-group">
+          <label for="operationImmediatePayment">Pago inmediato (opcional)</label>
+          <input type="number" id="operationImmediatePayment" class="form-control" [class.is-invalid]="isProductAmountInvalid()" [(ngModel)]="operationForm.amount" name="operationImmediatePayment" min="0" step="any" placeholder="0">
+          <span class="field-note">Se registra como un pago vinculado a esta operación. Si no pagas ahora, se envía 0.</span>
+          <span *ngIf="isProductAmountInvalid()" class="field-error">Ingresa un pago inmediato válido.</span>
         </div>
         <div class="form-actions">
           <button
@@ -208,10 +225,17 @@
       <div *ngIf="operationMode === 'products' && items.length" class="items-list">
         <div class="items-title">Productos agregados</div>
         <div class="items-row" *ngFor="let item of items; trackBy: trackByItemProductId">
-          <div>{{ item.productName }}</div>
-          <div class="items-qty">x{{ item.quantity }}</div>
+          <div class="item-product-name">{{ item.productName }} · Disponible: {{ getProductQuantity(item.productId) }}</div>
+          <label class="item-field">Cantidad
+            <input type="number" class="form-control" [(ngModel)]="item.quantity" [name]="'itemQuantity' + item.productId" min="1" step="1">
+          </label>
+          <label class="item-field">Precio unitario
+            <input type="number" class="form-control" [(ngModel)]="item.price" [name]="'itemPrice' + item.productId" min="0" step="any">
+          </label>
+          <div class="item-total">Total: {{ getLineTotal(item) | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</div>
           <button type="button" class="btn btn-xs btn-danger" (click)="removeItem(item)">Quitar</button>
         </div>
+        <div class="items-operation-total">Total de la operación: {{ getItemsTotal() | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</div>
       </div>
       <div *ngIf="operationFormError" class="inline-alert" role="alert">
         {{ operationFormError }}
@@ -258,9 +282,12 @@
           <div class="detail-product-row" *ngFor="let product of operation.productResponses; trackBy: trackByOperationProductId">
             <div class="detail-product-main">
               <div class="detail-product-name">{{ product.name }}</div>
-              <div class="detail-product-meta">{{ product.unitType }}</div>
             </div>
-            <div class="detail-product-qty">x{{ product.quantity }}</div>
+            <dl class="detail-product-values">
+              <div><dt>Cantidad</dt><dd>{{ product.quantity }}</dd></div>
+              <div><dt>Precio unitario</dt><dd>{{ product.price | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+              <div><dt>Total</dt><dd>{{ product.totalPrice | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+            </dl>
           </div>
         </div>
         <ng-template #noProducts>

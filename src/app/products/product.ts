@@ -2,7 +2,6 @@ export interface ProductResponse {
   id: number;
   name: string;
   quantity: number;
-  price: number;
   cost: number;
   unitType: string;
   categoryName: string;
@@ -12,7 +11,6 @@ export interface ProductResponse {
 export interface ProductRequest {
   name: string;
   quantity: number;
-  price: number;
   cost: number;
   unitType: string;
   categoryId: number;
