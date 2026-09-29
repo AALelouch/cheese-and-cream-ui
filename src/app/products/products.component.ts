@@ -44,7 +44,6 @@ export class ProductsComponent implements OnInit {
   productForm: ProductRequest = {
     name: '',
     quantity: 0,
-    price: 0,
     cost: 0,
     unitType: '',
     categoryId: 0,
@@ -285,7 +284,6 @@ export class ProductsComponent implements OnInit {
     this.productForm = {
       name: product.name ?? '',
       quantity: product.quantity ?? 0,
-      price: product.price ?? 0,
       cost: product.cost ?? 0,
       unitType: product.unitType ?? '',
       categoryId: this.categories.find(category => category.name === product.categoryName)?.id ?? 0,
@@ -303,7 +301,6 @@ export class ProductsComponent implements OnInit {
     this.productForm = {
       name: '',
       quantity: 0,
-      price: 0,
       cost: 0,
       unitType: '',
       categoryId: 0,

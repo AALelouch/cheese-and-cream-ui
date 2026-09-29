@@ -31,8 +31,8 @@
         <th>Email</th>
         <th>Teléfono</th>
         <th>Dirección</th>
-        <th *ngIf="role === 'CLIENT'">Por cobrar</th>
-        <th *ngIf="role === 'PROVIDER'">Por pagar</th>
+        <th>Por cobrar</th>
+        <th>Por pagar</th>
         <th>Saldo neto</th>
         <th>Tipo de ID</th>
         <th>Número de ID</th>
@@ -46,8 +46,8 @@
         <td>{{ agent.email }}</td>
         <td>{{ agent.phoneNumber }}</td>
         <td>{{ agent.address }}</td>
-        <td *ngIf="role === 'CLIENT'" class="amount">{{ formatMoney(agent.receivables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
-        <td *ngIf="role === 'PROVIDER'" class="amount">{{ formatMoney(agent.payables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+        <td class="amount">{{ formatMoney(agent.receivables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+        <td class="amount">{{ formatMoney(agent.payables) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
         <td class="amount">{{ formatMoney(agent.balance) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
         <td>{{ getAgentIdentificationType(agent) }}</td>
         <td>{{ agent.identificationNumber }}</td>
