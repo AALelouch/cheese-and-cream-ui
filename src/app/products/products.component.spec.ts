@@ -39,7 +39,7 @@ describe('ProductsComponent', () => {
   });
 
   it('trims product names and reloads the owner inventory after creation', () => {
-    component.productForm = { name: '  Queso costeño ', quantity: 2, price: 8, cost: 4, unitType: 'kg', categoryId: 3, agendId: 7 };
+    component.productForm = { name: '  Queso costeño ', quantity: 2, cost: 4, unitType: 'kg', categoryId: 3, agendId: 7 };
     component.saveProduct();
 
     expect(products.createProduct).toHaveBeenCalledWith(expect.objectContaining({ name: 'Queso costeño', agendId: 7 }));
