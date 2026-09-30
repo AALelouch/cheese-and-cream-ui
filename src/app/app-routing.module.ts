@@ -8,6 +8,7 @@ export const routes: Routes = [
   { path: 'providers', loadComponent: () => import('./agents/agents.component').then(module => module.AgentsComponent), data: { role: 'PROVIDER' }, canActivate: [authGuard] },
   { path: 'agents', redirectTo: '/clients', pathMatch: 'full' },
   { path: 'financial-operations', loadComponent: () => import('./financial-operations/financial-operations.component').then(module => module.FinancialOperationsComponent), canActivate: [authGuard] },
+  { path: 'operating-costs', loadComponent: () => import('./operating-costs/operating-costs.component').then(module => module.OperatingCostsComponent), canActivate: [authGuard] },
   { path: 'products', loadComponent: () => import('./products/products.component').then(module => module.ProductsComponent), canActivate: [authGuard] },
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
   { path: '**', redirectTo: '/dashboard' }
