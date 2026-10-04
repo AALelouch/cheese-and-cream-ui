@@ -278,18 +278,27 @@
 
       <div class="detail-products">
         <div class="detail-section-title">Productos</div>
-        <div *ngIf="operation.productResponses.length; else noProducts" class="detail-product-list">
-          <div class="detail-product-row" *ngFor="let product of operation.productResponses; trackBy: trackByOperationProductId">
-            <div class="detail-product-main">
-              <div class="detail-product-name">{{ product.name }}</div>
-            </div>
-            <dl class="detail-product-values">
-              <div><dt>Cantidad</dt><dd>{{ product.quantity }}</dd></div>
-              <div><dt>Precio unitario</dt><dd>{{ product.price | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
-              <div><dt>Total</dt><dd>{{ product.totalPrice | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
-            </dl>
-          </div>
+        <div *ngIf="isLoadingOperationDetails" class="empty-state empty-state-inline" aria-live="polite">Cargando productos…</div>
+        <div *ngIf="operationDetailsError" class="inline-alert detail-error" role="alert">
+          <span>{{ operationDetailsError }}</span>
+          <button type="button" class="btn btn-xs btn-outline" (click)="retryOperationDetails()" [disabled]="isLoadingOperationDetails">Reintentar</button>
         </div>
+        <ng-container *ngIf="!isLoadingOperationDetails && !operationDetailsError">
+          <ng-container *ngIf="operationDetails as details">
+            <div *ngIf="details.products.length; else noProducts" class="detail-product-list">
+              <div class="detail-product-row" *ngFor="let product of details.products; trackBy: trackByOperationProductId">
+                <div class="detail-product-main">
+                  <div class="detail-product-name">{{ product.name }}</div>
+                </div>
+                <dl class="detail-product-values">
+                  <div><dt>Cantidad</dt><dd>{{ product.quantity }}</dd></div>
+                  <div><dt>Precio unitario</dt><dd>{{ product.price | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+                  <div><dt>Total</dt><dd>{{ product.totalPrice | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+                </dl>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
         <ng-template #noProducts>
           <div class="empty-state empty-state-inline">No hay productos asociados a esta operacion.</div>
         </ng-template>

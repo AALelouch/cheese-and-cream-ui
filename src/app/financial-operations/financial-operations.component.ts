@@ -1,13 +1,20 @@
 import { ChangeDetectorRef, Component, NgZone, OnInit, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap, take } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { AGENT_ROLE_LABEL, AgentResponse, AgentRole } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { ProductResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
-import { FinancialOperationRequest, FinancialOperationResponse, OPERATION_TYPE_LABELS, OperationType } from './financial-operation';
+import {
+  FinancialOperationDetailsResponse,
+  FinancialOperationProductResponse,
+  FinancialOperationRequest,
+  FinancialOperationSummaryResponse,
+  OPERATION_TYPE_LABELS,
+  OperationType
+} from './financial-operation';
 import { FinancialOperationService, FINANCIAL_OPERATION_DEFAULT_SORT } from './financial-operation.service';
 import { createPaginationState, DEFAULT_PAGE_SIZE, updatePaginationState } from '../shared/pagination';
 
@@ -35,8 +42,11 @@ interface OperationForm {
 export class FinancialOperationsComponent implements OnInit {
   agents: AgentResponse[] = [];
   productsByAgent: Record<number, ProductResponse[]> = {};
-  operations: FinancialOperationResponse[] = [];
-  selectedOperation: FinancialOperationResponse | null = null;
+  operations: FinancialOperationSummaryResponse[] = [];
+  selectedOperation: FinancialOperationSummaryResponse | null = null;
+  operationDetails: FinancialOperationDetailsResponse | null = null;
+  isLoadingOperationDetails = false;
+  operationDetailsError = '';
   selectedAgentId: number | null = null;
   partyRole: AgentRole = 'CLIENT';
   agentSearchTerm = '';
@@ -75,6 +85,7 @@ export class FinancialOperationsComponent implements OnInit {
   pagination = createPaginationState();
   readonly operationTypeLabels = OPERATION_TYPE_LABELS;
   private operationsRequestId = 0;
+  private operationDetailsRequestId = 0;
   private readonly productsRequestIds = new Map<number, number>();
   private readonly productsLoading = new Set<number>();
   private readonly agentSearchTerms = new Subject<string>();
@@ -389,16 +400,65 @@ export class FinancialOperationsComponent implements OnInit {
     if (this.selectedAgentId) this.loadOperations(this.selectedAgentId, 0);
   }
 
-  openOperationDetail(template: TemplateRef<any>, operation: FinancialOperationResponse): void {
+  openOperationDetail(template: TemplateRef<any>, operation: FinancialOperationSummaryResponse): void {
+    const requestId = ++this.operationDetailsRequestId;
     this.selectedOperation = operation;
-    this.modalRef = this.modalService.show(template, {
+    this.operationDetails = null;
+    this.operationDetailsError = '';
+    this.isLoadingOperationDetails = true;
+    const detailModalRef = this.modalService.show(template, {
       class: 'modal-lg modal-dialog-centered financial-operation-modal'
     });
+    this.modalRef = detailModalRef;
+    detailModalRef.onHide?.pipe(take(1)).subscribe(() => {
+      if (this.modalRef === detailModalRef) this.clearOperationDetail();
+    });
+    this.loadOperationDetails(operation.id, requestId);
+  }
+
+  retryOperationDetails(): void {
+    if (!this.selectedOperation || this.isLoadingOperationDetails) return;
+    const requestId = ++this.operationDetailsRequestId;
+    this.operationDetails = null;
+    this.operationDetailsError = '';
+    this.isLoadingOperationDetails = true;
+    this.loadOperationDetails(this.selectedOperation.id, requestId);
   }
 
   closeModal(): void {
     this.modalRef?.hide();
+    this.clearOperationDetail();
+  }
+
+  private loadOperationDetails(operationId: number, requestId: number): void {
+    this.financialOperationService.getOperationDetails(operationId).subscribe({
+      next: details => {
+        if (requestId !== this.operationDetailsRequestId || this.selectedOperation?.id !== operationId) return;
+        this.zone.run(() => {
+          this.operationDetails = details;
+          this.isLoadingOperationDetails = false;
+          this.cdr.detectChanges();
+        });
+      },
+      error: () => {
+        if (requestId !== this.operationDetailsRequestId || this.selectedOperation?.id !== operationId) return;
+        this.zone.run(() => {
+          this.operationDetails = null;
+          this.isLoadingOperationDetails = false;
+          this.operationDetailsError = 'No se pudieron cargar los productos de esta operacion.';
+          this.cdr.detectChanges();
+        });
+      }
+    });
+  }
+
+  private clearOperationDetail(): void {
+    ++this.operationDetailsRequestId;
     this.selectedOperation = null;
+    this.operationDetails = null;
+    this.isLoadingOperationDetails = false;
+    this.operationDetailsError = '';
+    this.modalRef = undefined;
   }
 
   openOperationModal(template: TemplateRef<any>): void {
@@ -795,7 +855,7 @@ export class FinancialOperationsComponent implements OnInit {
     return agent.id;
   }
 
-  trackByOperationId(index: number, operation: FinancialOperationResponse): number {
+  trackByOperationId(index: number, operation: FinancialOperationSummaryResponse): number {
     return operation.id;
   }
 
@@ -807,7 +867,7 @@ export class FinancialOperationsComponent implements OnInit {
     return item.productId;
   }
 
-  trackByOperationProductId(index: number, product: FinancialOperationResponse['productResponses'][number]): number {
+  trackByOperationProductId(index: number, product: FinancialOperationProductResponse): number {
     return product.id;
   }
 }

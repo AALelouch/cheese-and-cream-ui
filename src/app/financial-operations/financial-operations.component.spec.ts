@@ -7,6 +7,7 @@ import { AgentResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { ProductResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
+import { FinancialOperationDetailsResponse, FinancialOperationSummaryResponse } from './financial-operation';
 import { FinancialOperationService } from './financial-operation.service';
 import { FinancialOperationsComponent } from './financial-operations.component';
 
@@ -18,6 +19,17 @@ const agents: AgentResponse[] = [
 const product = (id: number, name = `Producto ${id}`): ProductResponse => ({ id, name, quantity: 3, cost: 5, unitType: 'Unidad', categoryName: 'Queso', agentName: '' });
 const operationItem = (productId: number, quantity: number, agentId = 2, productName = `Producto ${productId}`, price = 10) => ({ productId, quantity, price, agentId, productName });
 const page = <T>(content: T[]) => ({ content, totalElements: content.length, totalPages: 1, size: 10, number: 0, numberOfElements: content.length, first: true, last: true, empty: !content.length });
+const operation = (id: number): FinancialOperationSummaryResponse => ({
+  id,
+  idAgent: 1,
+  concept: `Operacion ${id}`,
+  total: 24000,
+  operationType: 'SALE',
+  date: '2026-10-03T12:00:00'
+});
+const operationDetails = (id: number): FinancialOperationDetailsResponse => ({
+  products: [{ id, name: `Producto ${id}`, quantity: 2, price: 12000, totalPrice: 24000 }]
+});
 
 describe('FinancialOperationsComponent', () => {
   let component: FinancialOperationsComponent;
@@ -30,7 +42,12 @@ describe('FinancialOperationsComponent', () => {
     getAgent: ReturnType<typeof vi.fn>;
   };
   let productService: { getProductsByAgentId: ReturnType<typeof vi.fn> };
-  let financialOperationService: { getByAgentId: ReturnType<typeof vi.fn>; createOperation: ReturnType<typeof vi.fn> };
+  let financialOperationService: {
+    getByAgentId: ReturnType<typeof vi.fn>;
+    searchOperations: ReturnType<typeof vi.fn>;
+    getOperationDetails: ReturnType<typeof vi.fn>;
+    createOperation: ReturnType<typeof vi.fn>;
+  };
   let modalService: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
@@ -42,7 +59,12 @@ describe('FinancialOperationsComponent', () => {
       , getAgent: vi.fn((id: number) => of(agents.find(agent => agent.id === id)!))
     };
     productService = { getProductsByAgentId: vi.fn(() => of(page([]))) };
-    financialOperationService = { getByAgentId: vi.fn(() => of(page([]))), createOperation: vi.fn(() => of(void 0)) };
+    financialOperationService = {
+      getByAgentId: vi.fn(() => of(page([]))),
+      searchOperations: vi.fn(() => of(page([]))),
+      getOperationDetails: vi.fn(() => of({ products: [] })),
+      createOperation: vi.fn(() => of(void 0))
+    };
     modalService = { show: vi.fn(() => ({ hide: vi.fn() })) };
 
     await TestBed.configureTestingModule({
@@ -296,6 +318,76 @@ describe('FinancialOperationsComponent', () => {
 
     expect(component.operationFormError).toBe('El concepto es obligatorio.');
     expect(component.operationsLoadError).toBe('');
+  });
+
+  it('opens the summary immediately and loads product details on demand', () => {
+    const detailsRequest = new Subject<FinancialOperationDetailsResponse>();
+    financialOperationService.getOperationDetails.mockReturnValue(detailsRequest);
+    const summary = operation(21);
+
+    component.openOperationDetail({} as TemplateRef<unknown>, summary);
+
+    expect(modalService.show).toHaveBeenCalled();
+    expect(component.selectedOperation).toBe(summary);
+    expect(component.isLoadingOperationDetails).toBe(true);
+    expect(component.operationDetails).toBeNull();
+    expect(financialOperationService.getOperationDetails).toHaveBeenCalledWith(21);
+
+    detailsRequest.next(operationDetails(9));
+    expect(component.selectedOperation).toBe(summary);
+    expect(component.operationDetails).toEqual(operationDetails(9));
+    expect(component.isLoadingOperationDetails).toBe(false);
+  });
+
+  it('shows a details error and retries without losing the selected summary', () => {
+    financialOperationService.getOperationDetails
+      .mockReturnValueOnce(throwError(() => new Error('offline')))
+      .mockReturnValueOnce(of(operationDetails(10)));
+    const summary = operation(22);
+
+    component.openOperationDetail({} as TemplateRef<unknown>, summary);
+    expect(component.selectedOperation).toBe(summary);
+    expect(component.operationDetailsError).toContain('No se pudieron cargar');
+    expect(component.isLoadingOperationDetails).toBe(false);
+
+    component.retryOperationDetails();
+    expect(financialOperationService.getOperationDetails).toHaveBeenCalledTimes(2);
+    expect(component.operationDetailsError).toBe('');
+    expect(component.operationDetails).toEqual(operationDetails(10));
+  });
+
+  it('keeps an empty details result for payments without product lines', () => {
+    financialOperationService.getOperationDetails.mockReturnValue(of({ products: [] }));
+    const payment = { ...operation(23), operationType: 'PAYMENT' as const };
+
+    component.openOperationDetail({} as TemplateRef<unknown>, payment);
+
+    expect(component.selectedOperation).toEqual(payment);
+    expect(component.operationDetails).toEqual({ products: [] });
+    expect(component.operationDetailsError).toBe('');
+    expect(component.isLoadingOperationDetails).toBe(false);
+  });
+
+  it('ignores late detail responses after selecting another operation or closing the modal', () => {
+    const firstRequest = new Subject<FinancialOperationDetailsResponse>();
+    const secondRequest = new Subject<FinancialOperationDetailsResponse>();
+    financialOperationService.getOperationDetails.mockImplementation((id: number) => id === 31 ? firstRequest : secondRequest);
+
+    component.openOperationDetail({} as TemplateRef<unknown>, operation(31));
+    component.openOperationDetail({} as TemplateRef<unknown>, operation(32));
+    firstRequest.next(operationDetails(31));
+    expect(component.selectedOperation?.id).toBe(32);
+    expect(component.operationDetails).toBeNull();
+
+    secondRequest.next(operationDetails(32));
+    expect(component.operationDetails).toEqual(operationDetails(32));
+
+    component.closeModal();
+    expect(component.selectedOperation).toBeNull();
+    expect(component.operationDetails).toBeNull();
+
+    secondRequest.next(operationDetails(99));
+    expect(component.operationDetails).toBeNull();
   });
 
   it('exposes the invariants used by the guarded template controls', () => {
