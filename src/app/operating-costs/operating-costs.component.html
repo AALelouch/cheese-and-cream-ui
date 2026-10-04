@@ -1,0 +1,86 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Administración</p>
+      <h2>Costos operativos</h2>
+      <p class="subtitle">Registra y consulta los gastos necesarios para operar el negocio.</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" (click)="openOperatingCostModal(operatingCostModal)">Agregar costo</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Listado de costos</h3>
+      <div class="pill">{{ totalElements }} registros</div>
+    </div>
+    <div class="search-field">
+      <label for="operatingCostSearch">Buscar costo</label>
+      <input id="operatingCostSearch" type="search" class="form-control" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChange($event)" placeholder="Concepto del costo">
+    </div>
+    <div class="month-filter" aria-label="Filtrar costos por mes">
+      <div class="form-group">
+        <label for="operatingCostMonth">Mes</label>
+        <select id="operatingCostMonth" class="form-control" [(ngModel)]="selectedMonth">
+          <option [ngValue]="null">Todos los meses</option>
+          <option *ngFor="let month of months; let index = index" [ngValue]="index + 1">{{ month }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="operatingCostYear">Año</label>
+        <input id="operatingCostYear" type="number" class="form-control" [min]="minimumYear" [max]="maximumYear" [(ngModel)]="selectedYear">
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-outline" [disabled]="selectedMonth === null || !isYearValid()" (click)="applyMonthFilter()">Filtrar</button>
+        <button *ngIf="selectedMonth !== null" type="button" class="btn btn-ghost" (click)="clearMonthFilter()">Limpiar</button>
+      </div>
+    </div>
+    <div *ngIf="isLoadingOperatingCosts" class="empty-state" aria-live="polite"><strong>Cargando costos operativos…</strong></div>
+    <div *ngIf="operatingCostsLoadError" class="inline-alert" role="alert">{{ operatingCostsLoadError }}</div>
+    <div *ngIf="!isLoadingOperatingCosts && !operatingCostsLoadError && operatingCosts.length; else noOperatingCosts" class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Concepto</th><th>Monto</th><th>Fecha de creación</th><th>Acciones</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let operatingCost of operatingCosts; trackBy: trackByOperatingCostId">
+            <td>{{ operatingCost.concept }}</td>
+            <td class="amount">{{ operatingCost.amount | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</td>
+            <td>{{ operatingCost.date | date:'medium':'':'es-CO' }}</td>
+            <td><div class="row-actions"><button type="button" class="btn btn-xs btn-outline" (click)="openEditOperatingCostModal(operatingCostModal, operatingCost)">Editar</button><button type="button" class="btn btn-xs btn-danger" [disabled]="isSavingOperatingCost" (click)="deleteOperatingCost(operatingCost)">Eliminar</button></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noOperatingCosts>
+      <div *ngIf="!isLoadingOperatingCosts && !operatingCostsLoadError" class="empty-state" aria-live="polite"><strong>{{ searchTerm || selectedMonth !== null ? 'No hay costos que coincidan.' : 'Aún no hay costos operativos.' }}</strong><span>{{ searchTerm || selectedMonth !== null ? 'Prueba con otro criterio.' : 'Agrega un costo para comenzar el registro.' }}</span></div>
+    </ng-template>
+    <div class="pagination-bar" *ngIf="totalElements">
+      <span>{{ totalElements }} registros · Página {{ page + 1 }} de {{ totalPages }}</span>
+      <label>Por página <select class="form-control pagination-size" [value]="pageSize" (change)="changePageSize($any($event.target).value)"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></label>
+      <div class="row-actions"><button type="button" class="btn btn-xs btn-ghost" [disabled]="first" (click)="changePage(page - 1)">Anterior</button><button type="button" class="btn btn-xs btn-ghost" [disabled]="last" (click)="changePage(page + 1)">Siguiente</button></div>
+    </div>
+  </div>
+
+  <ng-template #operatingCostModal>
+    <div class="modal-header">
+      <h4 class="modal-title pull-left">{{ editingOperatingCostId === null ? 'Agregar costo operativo' : 'Editar costo operativo' }}</h4>
+      <button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="modal-body">
+      <form class="form-grid" (ngSubmit)="saveOperatingCost()">
+        <div class="form-group">
+          <label for="operatingCostConcept">Concepto</label>
+          <input id="operatingCostConcept" type="text" class="form-control" [class.is-invalid]="isConceptInvalid()" [(ngModel)]="operatingCostForm.concept" name="operatingCostConcept">
+          <span *ngIf="isConceptInvalid()" class="field-error">Campo obligatorio.</span>
+        </div>
+        <div class="form-group">
+          <label for="operatingCostAmount">Monto</label>
+          <input id="operatingCostAmount" type="number" min="0.01" step="0.01" class="form-control" [class.is-invalid]="isAmountInvalid()" [(ngModel)]="operatingCostForm.amount" name="operatingCostAmount">
+          <span *ngIf="isAmountInvalid()" class="field-error">Ingresa un monto mayor a cero.</span>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn btn-primary" [disabled]="isSavingOperatingCost">{{ isSavingOperatingCost ? 'Guardando…' : 'Guardar' }}</button><button type="button" class="btn btn-ghost" (click)="modalRef?.hide()">Cancelar</button></div>
+      </form>
+      <div *ngIf="operatingCostFormError" class="inline-alert" role="alert">{{ operatingCostFormError }}</div>
+    </div>
+  </ng-template>
+</div>

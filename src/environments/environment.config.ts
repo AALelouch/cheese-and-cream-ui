@@ -5,6 +5,7 @@ export interface ApiEndpoints {
   readonly products: string;
   readonly categories: string;
   readonly financialOperations: string;
+  readonly operatingCosts: string;
   readonly dashboard: string;
 }
 
@@ -41,6 +42,7 @@ const API_PATHS = {
   products: '/api/products',
   categories: '/api/categories',
   financialOperations: '/api/financial-operations',
+  operatingCosts: '/api/operating-cost',
   dashboard: '/api/dashboard'
 } as const;
 
@@ -69,6 +71,7 @@ export function createEnvironment({ production, apiBaseUrl }: EnvironmentOptions
         products: buildApiUrl(API_PATHS.products),
         categories: buildApiUrl(API_PATHS.categories),
         financialOperations: buildApiUrl(API_PATHS.financialOperations),
+        operatingCosts: buildApiUrl(API_PATHS.operatingCosts),
         dashboard: buildApiUrl(API_PATHS.dashboard)
       }
     },

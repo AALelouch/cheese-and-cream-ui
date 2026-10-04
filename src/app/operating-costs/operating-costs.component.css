@@ -1,0 +1,5 @@
+.search-field { display: grid; gap: 7px; margin: 0 0 18px; max-width: 560px; }
+.month-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 0 0 18px; }
+.month-filter .form-group { min-width: 150px; margin: 0; }
+.filter-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
