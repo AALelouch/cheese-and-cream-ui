@@ -20,6 +20,11 @@ export interface AgentResponse {
   identificationNumber: string;
 }
 
+export interface AgentIdNameResponse {
+  id: number;
+  name: string;
+}
+
 export interface AgentUpsertRequest {
   name: string;
   email: string;

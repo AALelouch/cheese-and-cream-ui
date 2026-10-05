@@ -1,7 +1,6 @@
 <div class="page">
   <div class="page-header">
     <div>
-      <p class="eyebrow">CRM</p>
       <h2>Gestión de {{ sectionLabel }}</h2>
       <p class="subtitle">Administra {{ singularLabel }}s, identificaciones y saldos.</p>
     </div>
@@ -26,17 +25,17 @@
       <table class="table">
     <thead>
       <tr>
-        <th>ID</th>
-        <th>Nombre</th>
-        <th>Email</th>
-        <th>Teléfono</th>
-        <th>Dirección</th>
-        <th>Por cobrar</th>
-        <th>Por pagar</th>
-        <th>Saldo neto</th>
-        <th>Tipo de ID</th>
-        <th>Número de ID</th>
-        <th>Acciones</th>
+        <th scope="col">ID</th>
+        <th scope="col">Nombre</th>
+        <th scope="col">Email</th>
+        <th scope="col">Teléfono</th>
+        <th scope="col">Dirección</th>
+        <th scope="col">Por cobrar</th>
+        <th scope="col">Por pagar</th>
+        <th scope="col">Saldo neto</th>
+        <th scope="col">Tipo de ID</th>
+        <th scope="col">Número de ID</th>
+        <th scope="col">Acciones</th>
       </tr>
     </thead>
     <tbody>
@@ -75,7 +74,7 @@
   <ng-template #agentModal>
     <div class="modal-header">
       <h4 class="modal-title pull-left">{{ editingAgentId ? 'Editar ' + singularLabel : 'Agregar ' + singularLabel }}</h4>
-      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+      <button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()">
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
@@ -148,7 +147,7 @@
   <ng-template #identityTypeModal>
     <div class="modal-header">
       <h4 class="modal-title pull-left">Gestionar Tipos de Identificacion</h4>
-      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+      <button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()">
         <span aria-hidden="true">&times;</span>
       </button>
     </div>

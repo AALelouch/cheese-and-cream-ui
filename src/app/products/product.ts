@@ -5,7 +5,12 @@ export interface ProductResponse {
   cost: number;
   unitType: string;
   categoryName: string;
-  agentName: string;
+}
+
+export interface ProductIdNameResponse {
+  id: number;
+  name: string;
+  quantity: number;
 }
 
 export interface ProductRequest {

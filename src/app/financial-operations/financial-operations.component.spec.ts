@@ -3,20 +3,20 @@ import { TemplateRef } from '@angular/core';
 import { BsModalService } from 'ngx-bootstrap/modal';
 import { Subject, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
-import { AgentResponse } from '../agents/agent';
+import { AgentIdNameResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
-import { ProductResponse } from '../products/product';
+import { ProductIdNameResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
 import { FinancialOperationDetailsResponse, FinancialOperationSummaryResponse } from './financial-operation';
 import { FinancialOperationService } from './financial-operation.service';
 import { FinancialOperationsComponent } from './financial-operations.component';
 
-const agents: AgentResponse[] = [
-  { id: 1, name: 'Principal', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'CLIENT', identificationType: '', identificationNumber: '' },
-  { id: 2, name: 'Inventario', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'PROVIDER', identificationType: '', identificationNumber: '' },
-  { id: 3, name: 'Otro inventario', email: '', phoneNumber: '', address: '', receivables: '0', payables: '0', balance: '0', role: 'PROVIDER', identificationType: '', identificationNumber: '' }
+const agents: AgentIdNameResponse[] = [
+  { id: 1, name: 'Principal' },
+  { id: 2, name: 'Inventario' },
+  { id: 3, name: 'Otro inventario' }
 ];
-const product = (id: number, name = `Producto ${id}`): ProductResponse => ({ id, name, quantity: 3, cost: 5, unitType: 'Unidad', categoryName: 'Queso', agentName: '' });
+const product = (id: number, name = `Producto ${id}`): ProductIdNameResponse => ({ id, name, quantity: 3 });
 const operationItem = (productId: number, quantity: number, agentId = 2, productName = `Producto ${productId}`, price = 10) => ({ productId, quantity, price, agentId, productName });
 const page = <T>(content: T[]) => ({ content, totalElements: content.length, totalPages: 1, size: 10, number: 0, numberOfElements: content.length, first: true, last: true, empty: !content.length });
 const operation = (id: number): FinancialOperationSummaryResponse => ({
@@ -35,13 +35,10 @@ describe('FinancialOperationsComponent', () => {
   let component: FinancialOperationsComponent;
   let fixture: ComponentFixture<FinancialOperationsComponent>;
   let agentService: {
-    getClients: ReturnType<typeof vi.fn>;
-    searchClients: ReturnType<typeof vi.fn>;
-    getProviders: ReturnType<typeof vi.fn>;
-    searchProviders: ReturnType<typeof vi.fn>;
-    getAgent: ReturnType<typeof vi.fn>;
+    searchClientIdNames: ReturnType<typeof vi.fn>;
+    searchProviderIdNames: ReturnType<typeof vi.fn>;
   };
-  let productService: { getProductsByAgentId: ReturnType<typeof vi.fn> };
+  let productService: { searchProductIdNames: ReturnType<typeof vi.fn> };
   let financialOperationService: {
     getByAgentId: ReturnType<typeof vi.fn>;
     searchOperations: ReturnType<typeof vi.fn>;
@@ -52,13 +49,10 @@ describe('FinancialOperationsComponent', () => {
 
   beforeEach(async () => {
     agentService = {
-      getClients: vi.fn(() => of(page([agents[0]]))),
-      searchClients: vi.fn(() => of(page([]))),
-      getProviders: vi.fn(() => of(page(agents.slice(1)))),
-      searchProviders: vi.fn(() => of(page([])))
-      , getAgent: vi.fn((id: number) => of(agents.find(agent => agent.id === id)!))
+      searchClientIdNames: vi.fn(() => of(page([agents[0]]))),
+      searchProviderIdNames: vi.fn(() => of(page(agents.slice(1))))
     };
-    productService = { getProductsByAgentId: vi.fn(() => of(page([]))) };
+    productService = { searchProductIdNames: vi.fn(() => of(page([]))) };
     financialOperationService = {
       getByAgentId: vi.fn(() => of(page([]))),
       searchOperations: vi.fn(() => of(page([]))),
@@ -89,9 +83,9 @@ describe('FinancialOperationsComponent', () => {
 
   it('loads general agents on init and reports an agents error', async () => {
     expect(component.agents).toEqual([agents[0]]);
-    expect(agentService.getClients).toHaveBeenCalledTimes(1);
+    expect(agentService.searchClientIdNames).toHaveBeenCalledWith('', { page: 0, size: 10 });
 
-    agentService.getClients.mockReturnValue(throwError(() => new Error('offline')));
+    agentService.searchClientIdNames.mockReturnValue(throwError(() => new Error('offline')));
     const anotherFixture = TestBed.createComponent(FinancialOperationsComponent);
     anotherFixture.detectChanges();
     anotherFixture.componentInstance.loadAgents();
@@ -101,11 +95,11 @@ describe('FinancialOperationsComponent', () => {
   it('requires an explicit, different inventory agent for SALE and loads only its products', () => {
     openForProducts();
     expect(component.operationAgentId).toBeNull();
-    expect(productService.getProductsByAgentId).not.toHaveBeenCalled();
+    expect(productService.searchProductIdNames).not.toHaveBeenCalled();
 
     component.operationAgentId = 2;
     component.onOperationAgentChange();
-    expect(productService.getProductsByAgentId).toHaveBeenCalledWith(2);
+    expect(productService.searchProductIdNames).toHaveBeenCalledWith(2, '', { page: 0, size: 10 });
 
     component.operationAgentId = 1;
     component.onOperationAgentChange();
@@ -120,13 +114,13 @@ describe('FinancialOperationsComponent', () => {
     component.operationAgentsSearchLast = false;
     component.operationAgentSearchTerm = '';
     component.loadMoreOperationAgents();
-    expect(agentService.getProviders).toHaveBeenCalledWith({ page: 0, size: 10 });
-    expect(agentService.searchClients).not.toHaveBeenCalled();
+    expect(agentService.searchProviderIdNames).toHaveBeenCalledWith('', { page: 0, size: 10 });
+    expect(agentService.searchClientIdNames).not.toHaveBeenCalledWith('', { page: 1, size: 10 });
 
     component.operationAgentsSearchLast = false;
     component.operationAgentSearchTerm = 'inventario';
     component.loadMoreOperationAgents();
-    expect(agentService.searchProviders).toHaveBeenCalledWith('inventario', { page: 1, size: 10 });
+    expect(agentService.searchProviderIdNames).toHaveBeenCalledWith('inventario', { page: 1, size: 10 });
   });
 
   it('loads and searches only inventory agents when the sale-with-products modal opens', async () => {
@@ -134,12 +128,11 @@ describe('FinancialOperationsComponent', () => {
     try {
       openForProducts();
       await vi.advanceTimersByTimeAsync(300);
-      expect(agentService.getProviders).toHaveBeenCalledWith({ page: 0, size: 10 });
+      expect(agentService.searchProviderIdNames).toHaveBeenCalledWith('', { page: 0, size: 10 });
 
       component.onOperationAgentSearchChange('proveedor');
       await vi.advanceTimersByTimeAsync(300);
-      expect(agentService.searchProviders).toHaveBeenCalledWith('proveedor', { page: 0, size: 10 });
-      expect(agentService.searchClients).not.toHaveBeenCalled();
+      expect(agentService.searchProviderIdNames).toHaveBeenCalledWith('proveedor', { page: 0, size: 10 });
     } finally {
       vi.useRealTimers();
     }
@@ -147,11 +140,12 @@ describe('FinancialOperationsComponent', () => {
 
   it('uses the main agent inventory for PURCHASE and never sends operationAgentId as idAgent', () => {
     openForProducts();
+    component.partyRole = 'PROVIDER';
     component.selectedAgentId = 2;
     component.operationForm.operationType = 'PURCHASE';
     component.onOperationTypeChange();
     expect(component.operationAgentId).toBeNull();
-    expect(productService.getProductsByAgentId).toHaveBeenCalledWith(2);
+    expect(productService.searchProductIdNames).toHaveBeenCalledWith(2, '', { page: 0, size: 10 });
 
     component.productsByAgent = { 2: [product(10)] };
     component.items = [operationItem(10, 2, 2)];
@@ -260,18 +254,18 @@ describe('FinancialOperationsComponent', () => {
   });
 
   it('caches successes, retries failures, and keeps delayed results out of the active selector', () => {
-    const first = new Subject<ReturnType<typeof page<ProductResponse>>>();
-    const second = new Subject<ReturnType<typeof page<ProductResponse>>>();
-    const retry = new Subject<ReturnType<typeof page<ProductResponse>>>();
+    const first = new Subject<ReturnType<typeof page<ProductIdNameResponse>>>();
+    const second = new Subject<ReturnType<typeof page<ProductIdNameResponse>>>();
+    const retry = new Subject<ReturnType<typeof page<ProductIdNameResponse>>>();
     let agent2Requests = 0;
-    productService.getProductsByAgentId.mockImplementation((id: number) => id === 2
+    productService.searchProductIdNames.mockImplementation((id: number) => id === 2
       ? (++agent2Requests === 1 ? first : retry)
       : second);
     openForProducts();
     component.operationAgentId = 2;
     component.onOperationAgentChange();
     component.refreshProductsForOperation();
-    expect(productService.getProductsByAgentId).toHaveBeenCalledTimes(1);
+    expect(productService.searchProductIdNames).toHaveBeenCalledTimes(1);
 
     component.operationAgentId = 3;
     component.onOperationAgentChange();
@@ -280,7 +274,7 @@ describe('FinancialOperationsComponent', () => {
     second.error(new Error('offline'));
     expect(component.hasCurrentInventoryLoadError()).toBe(true);
     component.retryProductsLoad();
-    expect(productService.getProductsByAgentId).toHaveBeenCalledTimes(3);
+    expect(productService.searchProductIdNames).toHaveBeenCalledTimes(3);
 
     component.operationAgentId = 2;
     component.onOperationAgentChange();

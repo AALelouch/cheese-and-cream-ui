@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AgentResponse, AgentUpsertRequest } from './agent';
+import { AgentIdNameResponse, AgentResponse, AgentUpsertRequest } from './agent';
 import { DEFAULT_PAGE_SIZE, PageRequest, PageResponse, toPageParams } from '../shared/pagination';
 import { environment } from '../../environments/environment';
 
@@ -29,6 +29,14 @@ export class AgentService {
 
   searchProviders(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentResponse>> {
     return this.http.post<PageResponse<AgentResponse>>(`${this.apiUrl}/search/providers`, { term }, { params: toPageParams(request) });
+  }
+
+  searchClientIdNames(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentIdNameResponse>> {
+    return this.http.post<PageResponse<AgentIdNameResponse>>(`${this.apiUrl}/search/id-name/clients`, { term }, { params: toPageParams(request) });
+  }
+
+  searchProviderIdNames(term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: AGENT_DEFAULT_SORT }): Observable<PageResponse<AgentIdNameResponse>> {
+    return this.http.post<PageResponse<AgentIdNameResponse>>(`${this.apiUrl}/search/id-name/providers`, { term }, { params: toPageParams(request) });
   }
 
   getAgent(id: number): Observable<AgentResponse> {

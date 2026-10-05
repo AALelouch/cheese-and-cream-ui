@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
-import { AgentResponse } from '../agents/agent';
+import { AgentIdNameResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { CategoryResponse } from './category';
 import { CategoryService } from './category.service';
@@ -21,8 +21,8 @@ import { removeById, replaceById } from '../shared/collection';
 })
 export class ProductsComponent implements OnInit {
   products: ProductResponse[] = [];
-  agents: AgentResponse[] = [];
-  providers: AgentResponse[] = [];
+  agents: AgentIdNameResponse[] = [];
+  providers: AgentIdNameResponse[] = [];
   categories: CategoryResponse[] = [];
   selectedAgentId: number | null = null;
   agentSearchTerm = '';
@@ -72,12 +72,7 @@ export class ProductsComponent implements OnInit {
   get totalPages(): number { return this.pagination.totalPages; }
   get first(): boolean { return this.pagination.first; }
   get last(): boolean { return this.pagination.last; }
-  get filteredProductFormAgents(): AgentResponse[] {
-    const term = this.productFormAgentSearchTerm.trim().toLocaleLowerCase();
-    if (!term) return this.agents;
-    return this.agents.filter(agent => [agent.name, agent.email, agent.identificationNumber]
-      .some(value => value?.toLocaleLowerCase().includes(term)));
-  }
+  get filteredProductFormAgents(): AgentIdNameResponse[] { return this.agents; }
   get filteredProductFormCategories(): CategoryResponse[] {
     const term = this.productFormCategorySearchTerm.trim().toLocaleLowerCase();
     return term ? this.categories.filter(category => category.name.toLocaleLowerCase().includes(term)) : this.categories;
@@ -92,8 +87,8 @@ export class ProductsComponent implements OnInit {
         this.isLoadingProviders = true;
         this.providersError = '';
         const request$ = term
-          ? this.agentService.searchProviders(term, { page: 0, size: 10 })
-          : this.agentService.getProviders({ page: 0, size: 10 });
+          ? this.agentService.searchProviderIdNames(term, { page: 0, size: 10 })
+          : this.agentService.searchProviderIdNames('', { page: 0, size: 10 });
         return request$.pipe(catchError(() => {
           this.isLoadingProviders = false;
           this.providersError = 'No se pudieron cargar los proveedores.';
@@ -163,7 +158,7 @@ export class ProductsComponent implements OnInit {
     });
   }
 
-  selectAgent(agent: AgentResponse): void {
+  selectAgent(agent: AgentIdNameResponse): void {
     if (this.selectedAgentId === agent.id) return;
     this.selectedAgentId = agent.id;
     this.productSearchTerm = '';
@@ -209,7 +204,7 @@ export class ProductsComponent implements OnInit {
   }
 
   loadProvidersForForm(term = ''): void {
-    const request$ = term ? this.agentService.searchProviders(term, { page: 0, size: 100 }) : this.agentService.getProviders({ page: 0, size: 100 });
+    const request$ = this.agentService.searchProviderIdNames(term, { page: 0, size: 10 });
     request$.subscribe({
       next: data => {
         this.zone.run(() => {
@@ -231,8 +226,8 @@ export class ProductsComponent implements OnInit {
     this.isLoadingProviders = true;
     this.providersError = '';
     const request$ = this.agentSearchTerm
-      ? this.agentService.searchProviders(this.agentSearchTerm, { page: this.providersPage, size: 10 })
-      : this.agentService.getProviders({ page: this.providersPage, size: 10 });
+      ? this.agentService.searchProviderIdNames(this.agentSearchTerm, { page: this.providersPage, size: 10 })
+      : this.agentService.searchProviderIdNames('', { page: this.providersPage, size: 10 });
     request$.subscribe({
       next: data => this.zone.run(() => {
         this.providers = [...this.providers, ...data.content];
@@ -287,7 +282,7 @@ export class ProductsComponent implements OnInit {
       cost: product.cost ?? 0,
       unitType: product.unitType ?? '',
       categoryId: this.categories.find(category => category.name === product.categoryName)?.id ?? 0,
-      agendId: this.selectedAgentId ?? this.agents.find(agent => agent.name === product.agentName)?.id ?? 0
+      agendId: this.selectedAgentId ?? 0
     };
     this.productError = '';
     this.productFormAgentSearchTerm = '';
@@ -542,7 +537,7 @@ export class ProductsComponent implements OnInit {
     return product.id;
   }
 
-  trackByAgentId(index: number, agent: AgentResponse): number {
+  trackByAgentId(index: number, agent: AgentIdNameResponse): number {
     return agent.id;
   }
 

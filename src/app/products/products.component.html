@@ -1,13 +1,12 @@
 <div class="page">
 	<div class="page-header">
 		<div>
-			<p class="eyebrow">Inventario</p>
-			<h2>Gestion de Productos</h2>
+			<h2>Gestión de productos</h2>
 			<p class="subtitle">Administra tus productos y asígnalos a un proveedor.</p>
 		</div>
 		<div class="actions">
-			<button class="btn btn-ghost" (click)="openCategoryModal(categoryModal)">Gestionar Categorias</button>
-			<button class="btn btn-primary" (click)="openProductModal(productModal)">Agregar Producto</button>
+			<button class="btn btn-ghost" (click)="openCategoryModal(categoryModal)">Gestionar categorías</button>
+			<button class="btn btn-primary" (click)="openProductModal(productModal)">Agregar producto</button>
 		</div>
 	</div>
 
@@ -18,7 +17,7 @@
 		</div>
 		<div class="search-field">
 			<label for="productsAgentSearch">Buscar proveedor</label>
-			<input id="productsAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+			<input id="productsAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre del proveedor">
 		</div>
 		<div *ngIf="isLoadingProviders" class="field-note" aria-live="polite">Buscando proveedores…</div>
 		<div class="agent-buttons">
@@ -52,13 +51,13 @@
 			<table class="table">
 				<thead>
 					<tr>
-						<th>ID</th>
-						<th>Nombre</th>
-						<th>Cantidad</th>
-						<th>Costo</th>
-						<th>Unidad</th>
-						<th>Categoría</th>
-						<th>Acciones</th>
+						<th scope="col">ID</th>
+						<th scope="col">Nombre</th>
+						<th scope="col">Cantidad</th>
+						<th scope="col">Costo</th>
+						<th scope="col">Unidad</th>
+						<th scope="col">Categoría</th>
+						<th scope="col">Acciones</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -93,7 +92,7 @@
 	<ng-template #productModal>
 		<div class="modal-header">
 			<h4 class="modal-title pull-left">{{ editingProductId ? 'Editar Producto' : 'Agregar Producto' }}</h4>
-			<button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+			<button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()">
 				<span aria-hidden="true">&times;</span>
 			</button>
 		</div>
@@ -154,7 +153,7 @@
 						[(ngModel)]="productFormAgentSearchTerm"
 						(ngModelChange)="loadProvidersForForm($event)"
 						name="productAgentSearch"
-						placeholder="Buscar por nombre, correo o identificación"
+						placeholder="Buscar proveedor por nombre"
 					>
 					<select
 						id="productAgent"
@@ -184,7 +183,7 @@
 	<ng-template #categoryModal>
 		<div class="modal-header">
 			<h4 class="modal-title pull-left">Gestionar Categorias</h4>
-			<button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+			<button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()">
 				<span aria-hidden="true">&times;</span>
 			</button>
 		</div>

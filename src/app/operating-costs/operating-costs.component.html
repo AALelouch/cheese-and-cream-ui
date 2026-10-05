@@ -1,7 +1,6 @@
 <div class="page">
   <div class="page-header">
     <div>
-      <p class="eyebrow">Administración</p>
       <h2>Costos operativos</h2>
       <p class="subtitle">Registra y consulta los gastos necesarios para operar el negocio.</p>
     </div>
@@ -40,7 +39,7 @@
     <div *ngIf="operatingCostsLoadError" class="inline-alert" role="alert">{{ operatingCostsLoadError }}</div>
     <div *ngIf="!isLoadingOperatingCosts && !operatingCostsLoadError && operatingCosts.length; else noOperatingCosts" class="table-wrap">
       <table class="table">
-        <thead><tr><th>Concepto</th><th>Monto</th><th>Fecha de creación</th><th>Acciones</th></tr></thead>
+        <thead><tr><th scope="col">Concepto</th><th scope="col">Monto</th><th scope="col">Fecha de creación</th><th scope="col">Acciones</th></tr></thead>
         <tbody>
           <tr *ngFor="let operatingCost of operatingCosts; trackBy: trackByOperatingCostId">
             <td>{{ operatingCost.concept }}</td>

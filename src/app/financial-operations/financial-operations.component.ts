@@ -3,9 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, finalize, Subject, switchMap, take } from 'rxjs';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
-import { AGENT_ROLE_LABEL, AgentResponse, AgentRole } from '../agents/agent';
+import { AgentIdNameResponse, AgentRole } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
-import { ProductResponse } from '../products/product';
+import { ProductIdNameResponse } from '../products/product';
 import { ProductService } from '../products/product.service';
 import {
   FinancialOperationDetailsResponse,
@@ -40,8 +40,8 @@ interface OperationForm {
   styleUrls: ['./financial-operations.component.css']
 })
 export class FinancialOperationsComponent implements OnInit {
-  agents: AgentResponse[] = [];
-  productsByAgent: Record<number, ProductResponse[]> = {};
+  agents: AgentIdNameResponse[] = [];
+  productsByAgent: Record<number, ProductIdNameResponse[]> = {};
   operations: FinancialOperationSummaryResponse[] = [];
   selectedOperation: FinancialOperationSummaryResponse | null = null;
   operationDetails: FinancialOperationDetailsResponse | null = null;
@@ -58,7 +58,7 @@ export class FinancialOperationsComponent implements OnInit {
   agentLookupError = '';
   isLoadingOperationAgents = false;
   operationAgentLookupError = '';
-  operationAgents: AgentResponse[] = [];
+  operationAgents: AgentIdNameResponse[] = [];
   operationAgentsSearchPage = 0;
   operationAgentsSearchLast = true;
   agentsSearchPage = 0;
@@ -101,12 +101,9 @@ export class FinancialOperationsComponent implements OnInit {
 
   getOperationLabel(type: OperationType): string { return this.operationTypeLabels[type]; }
 
-  getAgentRoleLabel(agent: AgentResponse): string { return AGENT_ROLE_LABEL[agent.role]; }
-
   isOperationTypeAllowed(type: OperationType): boolean {
-    const agent = this.getSelectedAgent();
-    if (!agent) return true;
-    return agent.role === 'CLIENT'
+    if (!this.selectedAgentId) return true;
+    return this.partyRole === 'CLIENT'
       ? type === 'SALE' || type === 'CLIENT_PAYMENT'
       : type === 'PURCHASE' || type === 'PAYMENT';
   }
@@ -228,18 +225,13 @@ export class FinancialOperationsComponent implements OnInit {
   }
 
   private getOperationAgentsRequest(term: string, request: { page: number; size: number }) {
-    return term
-      ? this.agentService.searchProviders(term, request)
-      : this.agentService.getProviders(request);
+    return this.agentService.searchProviderIdNames(term, request);
   }
 
   private getPartyRequest(term: string, request: { page: number; size: number }) {
-    if (term.trim()) return this.partyRole === 'CLIENT'
-      ? this.agentService.searchClients(term, request)
-      : this.agentService.searchProviders(term, request);
     return this.partyRole === 'CLIENT'
-      ? this.agentService.getClients(request)
-      : this.agentService.getProviders(request);
+      ? this.agentService.searchClientIdNames(term, request)
+      : this.agentService.searchProviderIdNames(term, request);
   }
 
   loadMoreOperationAgents(): void {
@@ -306,7 +298,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.productsRequestIds.set(agentId, requestId);
     this.productsLoading.add(agentId);
     if (this.productsLoadErrorAgentId === agentId) this.productsLoadErrorAgentId = null;
-    this.productService.getProductsByAgentId(agentId).subscribe({
+    this.productService.searchProductIdNames(agentId, '', { page: 0, size: 10 }).subscribe({
       next: data => {
         if (this.productsRequestIds.get(agentId) !== requestId) return;
         this.zone.run(() => {
@@ -344,9 +336,8 @@ export class FinancialOperationsComponent implements OnInit {
     if (inventoryAgentId && this.isInventoryAgentValid()) this.loadProductsByAgent(inventoryAgentId);
   }
 
-  selectAgent(agent: AgentResponse): void {
+  selectAgent(agent: AgentIdNameResponse): void {
     if (this.selectedAgentId === agent.id) return;
-    this.partyRole = agent.role;
     this.selectedAgentId = agent.id;
     this.operationSearchTerm = '';
     this.productSearchTerm = '';
@@ -478,7 +469,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.operationForm = {
       amount: null,
       concept: '',
-      operationType: this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE'
+      operationType: this.partyRole === 'PROVIDER' ? 'PURCHASE' : 'SALE'
     };
     this.operationMode = 'amount';
     this.operationAgentId = null;
@@ -610,7 +601,6 @@ export class FinancialOperationsComponent implements OnInit {
           if (inventoryAgentId) this.invalidateProducts(inventoryAgentId);
           this.selectedAgentId = requestAgentId;
           this.loadOperations(requestAgentId);
-          this.refreshSelectedAgent(requestAgentId);
           this.modalRef?.hide();
           this.resetOperationForm();
           this.cdr.detectChanges();
@@ -685,7 +675,7 @@ export class FinancialOperationsComponent implements OnInit {
     return this.getCurrentProductOptions().find(product => product.id === productId)?.name ?? '';
   }
 
-  getCurrentProductOptions(): ProductResponse[] {
+  getCurrentProductOptions(): ProductIdNameResponse[] {
     const inventoryAgentId = this.getInventoryAgentId();
     return inventoryAgentId ? (this.productsByAgent[inventoryAgentId] ?? []) : [];
   }
@@ -700,7 +690,7 @@ export class FinancialOperationsComponent implements OnInit {
   onOperationModeChange(mode: 'amount' | 'products'): void {
     this.operationMode = mode;
     if (mode === 'products' && !this.isProductOperationType()) {
-      this.operationForm.operationType = this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE';
+      this.operationForm.operationType = this.partyRole === 'PROVIDER' ? 'PURCHASE' : 'SALE';
     }
     this.operationAgentId = null;
     this.resetProductSelection();
@@ -725,7 +715,7 @@ export class FinancialOperationsComponent implements OnInit {
     this.selectedProductId = 0;
     this.items = [];
     this.productsLoading.add(inventoryAgentId);
-    this.productService.searchProducts(inventoryAgentId, term, { page: 0, size: 10 }).subscribe({
+    this.productService.searchProductIdNames(inventoryAgentId, term, { page: 0, size: 10 }).subscribe({
       next: data => this.zone.run(() => {
         this.productsLoading.delete(inventoryAgentId);
         this.productsByAgent = { ...this.productsByAgent, [inventoryAgentId]: data.content };
@@ -745,7 +735,7 @@ export class FinancialOperationsComponent implements OnInit {
     const inventoryAgentId = this.getInventoryAgentId();
     if (!inventoryAgentId || this.productsLoading.has(inventoryAgentId) || this.productSearchLast) return;
     this.productsLoading.add(inventoryAgentId);
-    this.productService.searchProducts(inventoryAgentId, this.productSearchTerm, { page: this.productSearchPage, size: 10 }).subscribe({
+    this.productService.searchProductIdNames(inventoryAgentId, this.productSearchTerm, { page: this.productSearchPage, size: 10 }).subscribe({
       next: data => this.zone.run(() => {
         this.productsLoading.delete(inventoryAgentId);
         this.productsByAgent = { ...this.productsByAgent, [inventoryAgentId]: [...this.getCurrentProductOptions(), ...data.content] };
@@ -795,23 +785,10 @@ export class FinancialOperationsComponent implements OnInit {
     return this.operationForm.operationType === 'SALE' || this.operationForm.operationType === 'PURCHASE';
   }
 
-  private getSelectedAgent(): AgentResponse | undefined {
-    return this.agents.find(agent => agent.id === this.selectedAgentId);
-  }
-
   private ensureOperationTypeForSelectedAgent(): void {
     if (!this.isOperationTypeAllowed(this.operationForm.operationType)) {
-      this.operationForm.operationType = this.getSelectedAgent()?.role === 'PROVIDER' ? 'PURCHASE' : 'SALE';
+      this.operationForm.operationType = this.partyRole === 'PROVIDER' ? 'PURCHASE' : 'SALE';
     }
-  }
-
-  private refreshSelectedAgent(agentId: number): void {
-    this.agentService.getAgent(agentId).subscribe({
-      next: updatedAgent => this.zone.run(() => {
-        this.agents = this.agents.map(agent => agent.id === agentId ? updatedAgent : agent);
-        this.cdr.detectChanges();
-      })
-    });
   }
 
   isInventoryAgentValid(): boolean {
@@ -851,7 +828,7 @@ export class FinancialOperationsComponent implements OnInit {
       : Number(this.operationForm.amount);
   }
 
-  trackByAgentId(index: number, agent: AgentResponse): number {
+  trackByAgentId(index: number, agent: AgentIdNameResponse): number {
     return agent.id;
   }
 
@@ -859,7 +836,7 @@ export class FinancialOperationsComponent implements OnInit {
     return operation.id;
   }
 
-  trackByProductId(index: number, product: ProductResponse): number {
+  trackByProductId(index: number, product: ProductIdNameResponse): number {
     return product.id;
   }
 
