@@ -31,4 +31,20 @@ describe('AgentService', () => {
     expect(providers.request.params.get('sort')).toBe('name,asc');
     providers.flush({ content: [] });
   });
+
+  it('uses lightweight id-name search endpoints for agent selectors', () => {
+    service.searchClientIdNames('', { page: 0, size: 10 }).subscribe();
+    const clients = http.expectOne(request => request.url.endsWith('/api/agents/search/id-name/clients'));
+    expect(clients.request.method).toBe('POST');
+    expect(clients.request.body).toEqual({ term: '' });
+    expect(clients.request.params.get('size')).toBe('10');
+    clients.flush({ content: [] });
+
+    service.searchProviderIdNames('quesos', { page: 1, size: 10 }).subscribe();
+    const providers = http.expectOne(request => request.url.endsWith('/api/agents/search/id-name/providers'));
+    expect(providers.request.method).toBe('POST');
+    expect(providers.request.body).toEqual({ term: 'quesos' });
+    expect(providers.request.params.get('page')).toBe('1');
+    providers.flush({ content: [] });
+  });
 });

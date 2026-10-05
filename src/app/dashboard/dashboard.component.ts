@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@ang
 import { CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, forkJoin, Subject, switchMap } from 'rxjs';
-import { AgentResponse } from '../agents/agent';
+import { AgentIdNameResponse } from '../agents/agent';
 import { AgentService } from '../agents/agent.service';
 import { DashboardMetrics } from './dashboard';
 import { DashboardService } from './dashboard.service';
@@ -21,7 +21,7 @@ export class DashboardComponent implements OnInit {
   private readonly agentService = inject(AgentService);
 
   readonly months = Array.from({ length: 12 }, (_, index) => index + 1);
-  readonly agents = signal<AgentResponse[]>([]);
+  readonly agents = signal<AgentIdNameResponse[]>([]);
   readonly metrics = signal<DashboardMetrics | null>(null);
   readonly totalPendingBalance = signal<number | null>(null);
   readonly monthlyPendingBalance = signal<number | null>(null);
@@ -48,7 +48,7 @@ export class DashboardComponent implements OnInit {
       switchMap(term => {
         this.isSearchingAgents.set(true);
         this.agentSearchError.set('');
-        return (term ? this.agentService.searchClients(term, { page: 0, size: 10 }) : this.agentService.getClients({ page: 0, size: 10 })).pipe(catchError(() => {
+        return this.agentService.searchClientIdNames(term, { page: 0, size: 10 }).pipe(catchError(() => {
           this.isSearchingAgents.set(false);
           this.agentSearchError.set('No se pudieron buscar los agentes.');
           return EMPTY;
@@ -98,9 +98,7 @@ export class DashboardComponent implements OnInit {
   loadMoreAgents(): void {
     if (this.isSearchingAgents() || this.agentsSearchLast()) return;
     this.isSearchingAgents.set(true);
-    (this.agentSearchTerm()
-      ? this.agentService.searchClients(this.agentSearchTerm(), { page: this.agentsSearchPage(), size: 10 })
-      : this.agentService.getClients({ page: this.agentsSearchPage(), size: 10 })).subscribe({
+    this.agentService.searchClientIdNames(this.agentSearchTerm(), { page: this.agentsSearchPage(), size: 10 }).subscribe({
       next: data => {
         this.agents.update(agents => [...agents, ...data.content]);
         this.agentsSearchPage.set(data.number + 1);

@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { FinancialOperationRequest, FinancialOperationResponse } from './financial-operation';
+import {
+  FinancialOperationDetailsResponse,
+  FinancialOperationRequest,
+  FinancialOperationSummaryResponse
+} from './financial-operation';
 import { DEFAULT_PAGE_SIZE, PageRequest, PageResponse, toPageParams } from '../shared/pagination';
 import { environment } from '../../environments/environment';
 
@@ -15,12 +19,16 @@ export class FinancialOperationService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getByAgentId(agentId: number, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: FINANCIAL_OPERATION_DEFAULT_SORT }): Observable<PageResponse<FinancialOperationResponse>> {
-    return this.http.get<PageResponse<FinancialOperationResponse>>(`${this.apiUrl}/agent/${agentId}`, { params: toPageParams(request) });
+  getByAgentId(agentId: number, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: FINANCIAL_OPERATION_DEFAULT_SORT }): Observable<PageResponse<FinancialOperationSummaryResponse>> {
+    return this.http.get<PageResponse<FinancialOperationSummaryResponse>>(`${this.apiUrl}/agent/${agentId}`, { params: toPageParams(request) });
   }
 
-  searchOperations(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: FINANCIAL_OPERATION_DEFAULT_SORT }): Observable<PageResponse<FinancialOperationResponse>> {
-    return this.http.post<PageResponse<FinancialOperationResponse>>(`${this.apiUrl}/agent/${agentId}/search`, { term }, { params: toPageParams(request) });
+  searchOperations(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: FINANCIAL_OPERATION_DEFAULT_SORT }): Observable<PageResponse<FinancialOperationSummaryResponse>> {
+    return this.http.post<PageResponse<FinancialOperationSummaryResponse>>(`${this.apiUrl}/agent/${agentId}/search`, { term }, { params: toPageParams(request) });
+  }
+
+  getOperationDetails(id: number): Observable<FinancialOperationDetailsResponse> {
+    return this.http.get<FinancialOperationDetailsResponse>(`${this.apiUrl}/details/${id}`);
   }
 
   createOperation(request: FinancialOperationRequest): Observable<void> {

@@ -1,4 +1,4 @@
-import { ChangeDetectorRef } from '@angular/core';
+import { ChangeDetectorRef, TemplateRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BsModalService } from 'ngx-bootstrap/modal';
 import { of, Subject, throwError } from 'rxjs';
@@ -14,12 +14,12 @@ const agent = { id: 7, name: 'Distribuidor', email: '', phoneNumber: '', address
 describe('ProductsComponent', () => {
   let component: ProductsComponent;
   let products: { getProductsByAgentId: ReturnType<typeof vi.fn>; searchProducts: ReturnType<typeof vi.fn>; createProduct: ReturnType<typeof vi.fn>; updateProduct: ReturnType<typeof vi.fn>; deleteProduct: ReturnType<typeof vi.fn> };
-  let agents: { getProviders: ReturnType<typeof vi.fn>; searchProviders: ReturnType<typeof vi.fn> };
+  let agents: { searchProviderIdNames: ReturnType<typeof vi.fn> };
   let categories: { getAllCategories: ReturnType<typeof vi.fn>; createCategory: ReturnType<typeof vi.fn>; updateCategory: ReturnType<typeof vi.fn>; deleteCategory: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     products = { getProductsByAgentId: vi.fn(() => of(page([]))), searchProducts: vi.fn(() => of(page([]))), createProduct: vi.fn(() => of(void 0)), updateProduct: vi.fn(() => of(void 0)), deleteProduct: vi.fn(() => of(void 0)) };
-    agents = { getProviders: vi.fn(() => of(page([]))), searchProviders: vi.fn(() => of(page([]))) };
+    agents = { searchProviderIdNames: vi.fn(() => of(page([]))) };
     categories = { getAllCategories: vi.fn(() => of([])), createCategory: vi.fn(() => of(void 0)), updateCategory: vi.fn(() => of(void 0)), deleteCategory: vi.fn(() => of(void 0)) };
     await TestBed.configureTestingModule({ imports: [ProductsComponent], providers: [
       { provide: ProductService, useValue: products }, { provide: AgentService, useValue: agents }, { provide: CategoryService, useValue: categories },
@@ -60,21 +60,68 @@ describe('ProductsComponent', () => {
   });
 
   it('uses provider lookup when preparing the product form', () => {
-    agents.getProviders.mockReturnValue(of(page([agent])));
+    agents.searchProviderIdNames.mockReturnValue(of(page([agent])));
     component.loadAgents();
 
-    expect(agents.getProviders).toHaveBeenCalledWith({ page: 0, size: 100 });
+    expect(agents.searchProviderIdNames).toHaveBeenCalledWith('', { page: 0, size: 10 });
   });
 
-  it('filters product-form agents by name, email, or identification without changing the selected value', () => {
-    component.agents = [agent, { ...agent, id: 8, name: 'María', email: 'maria@example.com', identificationNumber: 'CC-55' }];
-    component.productForm.agendId = 7;
-    component.productFormAgentSearchTerm = 'maria@';
+  it('uses only the selected agent id when preparing a product for editing', () => {
+    component.selectedAgentId = 7;
+    component.categories = [{ id: 3, name: 'Quesos' }];
 
-    expect(component.filteredProductFormAgents.map(item => item.id)).toEqual([8]);
+    component.openEditProductModal({} as TemplateRef<unknown>, {
+      id: 11,
+      name: 'Queso costeño',
+      quantity: 2,
+      cost: 4,
+      unitType: 'kg',
+      categoryName: 'Quesos'
+    });
+
     expect(component.productForm.agendId).toBe(7);
-    component.productFormAgentSearchTerm = 'cc-55';
-    expect(component.filteredProductFormAgents.map(item => item.id)).toEqual([8]);
+    expect(component.productForm.categoryId).toBe(3);
+  });
+
+  it('does not infer an agent when no agent is selected for editing', () => {
+    component.selectedAgentId = null;
+
+    component.openEditProductModal({} as TemplateRef<unknown>, {
+      id: 11,
+      name: 'Queso costeño',
+      quantity: 2,
+      cost: 4,
+      unitType: 'kg',
+      categoryName: 'Quesos'
+    });
+
+    expect(component.productForm.agendId).toBe(0);
+  });
+
+  it('sends the selected agent id when updating a product', () => {
+    component.selectedAgentId = 7;
+    component.categories = [{ id: 3, name: 'Quesos' }];
+    component.openEditProductModal({} as TemplateRef<unknown>, {
+      id: 11,
+      name: 'Queso costeño',
+      quantity: 2,
+      cost: 4,
+      unitType: 'kg',
+      categoryName: 'Quesos'
+    });
+
+    component.saveProduct();
+
+    expect(products.updateProduct).toHaveBeenCalledWith(11, expect.objectContaining({ agendId: 7 }));
+  });
+
+  it('uses the lightweight server results without changing the selected value', () => {
+    component.agents = [agent, { id: 8, name: 'María' }];
+    component.productForm.agendId = 7;
+    component.productFormAgentSearchTerm = 'maría';
+
+    expect(component.filteredProductFormAgents.map(item => item.id)).toEqual([7, 8]);
+    expect(component.productForm.agendId).toBe(7);
   });
 
   it('filters categories by their term and clears both form searches on reset', () => {

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 
@@ -23,6 +23,11 @@ export class AppComponent {
 
   closeNavigation(): void {
     this.isNavigationOpen = false;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.closeNavigation();
   }
 
   logout(): void { this.closeNavigation(); this.auth.logout(); }

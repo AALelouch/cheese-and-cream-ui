@@ -1,15 +1,14 @@
 <main class="page" aria-labelledby="dashboard-title">
 	<header class="page-header">
 		<div>
-			<p class="eyebrow">Resumen del negocio</p>
 			<h1 id="dashboard-title">Panel financiero</h1>
-			<p class="subtitle">Controla los ingresos, las ganancias y los saldos de clientes.</p>
+			<p class="subtitle">Ingresos, rentabilidad y cartera del negocio en una sola lectura.</p>
 		</div>
 
 		<div class="actions" aria-label="Controles del panel">
 			<label class="month-control">
 				<span>Mes del informe</span>
-				<select class="form-control" [value]="selectedMonth()" (change)="onMonthChange($event)">
+				<select class="form-control" [ngModel]="selectedMonth()" (ngModelChange)="loadDashboard($event)">
 					@for (month of months; track month) {
 						<option [value]="month">{{ formatMonth(month) }}</option>
 					}
@@ -24,8 +23,8 @@
 
 	@if (error()) {
 		<div class="inline-alert" role="alert">
-			<svg lucideCircleAlert size="18"></svg>
-			{{ error() }}
+			<span><svg lucideCircleAlert size="18"></svg>{{ error() }}</span>
+			<button class="btn btn-xs btn-outline" type="button" (click)="loadDashboard(selectedMonth())">Reintentar</button>
 		</div>
 	}
 
@@ -37,26 +36,26 @@
 	} @else {
 		<section class="metrics-grid" aria-label="Métricas financieras mensuales">
 			<article class="metric-card metric-revenue">
-				<div class="metric-icon"><svg lucideChartNoAxesCombined size="21"></svg></div>
+				<div class="metric-icon" aria-hidden="true"><svg lucideChartNoAxesCombined size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Ingresos totales</p>
-					<p class="metric-value">{{ metrics()?.totalRevenue ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
+					@if (metrics(); as dashboardMetrics) { <p class="metric-value">{{ dashboardMetrics.totalRevenue | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p> } @else { <p class="metric-value unavailable" aria-label="No disponible">—</p> }
 					  <p class="metric-helper">Ventas del mes</p>
 				</div>
 			</article>
 			<article class="metric-card metric-profit">
-				<div class="metric-icon"><svg lucideCoins size="21"></svg></div>
+				<div class="metric-icon" aria-hidden="true"><svg lucideCoins size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Ganancia total</p>
-					<p class="metric-value">{{ metrics()?.totalProfit ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
-					  <p class="metric-helper">Ventas y pagos</p>
+					@if (metrics(); as dashboardMetrics) { <p class="metric-value">{{ dashboardMetrics.totalProfit | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p> } @else { <p class="metric-value unavailable" aria-label="No disponible">—</p> }
+					  <p class="metric-helper">Ventas menos costo de producto</p>
 				</div>
 			</article>
 			<article class="metric-card metric-pending">
-				<div class="metric-icon"><svg lucideClock3 size="21"></svg></div>
+				<div class="metric-icon" aria-hidden="true"><svg lucideClock3 size="21"></svg></div>
 				<div>
 					  <p class="metric-label">Saldo pendiente</p>
-					<p class="metric-value">{{ metrics()?.pendingBalance ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p>
+					@if (metrics(); as dashboardMetrics) { <p class="metric-value">{{ dashboardMetrics.pendingBalance | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</p> } @else { <p class="metric-value unavailable" aria-label="No disponible">—</p> }
 					  <p class="metric-helper">Pendiente del mes</p>
 				</div>
 			</article>
@@ -66,19 +65,19 @@
 			<article class="card receivables-card">
 				<div class="card-header">
 					<div>
-						<p class="eyebrow">Cuentas por cobrar</p>
-						<h2>Saldos pendientes</h2>
+						<h2>Cuentas por cobrar</h2>
+						<p>Compara la cartera histórica con el periodo seleccionado.</p>
 					</div>
 					<svg lucideWalletCards class="section-icon" size="22"></svg>
 				</div>
 				<div class="balance-list">
 					<div class="balance-row">
 						<span>Saldo histórico de clientes</span>
-						<strong>{{ totalPendingBalance() ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
+						@if (totalPendingBalance() !== null) { <strong>{{ totalPendingBalance() | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong> } @else { <strong aria-label="No disponible">—</strong> }
 					</div>
 					<div class="balance-row">
 						<span>Saldo de {{ formatMonth(selectedMonth()) }}</span>
-						<strong>{{ monthlyPendingBalance() ?? 0 | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
+						@if (monthlyPendingBalance() !== null) { <strong>{{ monthlyPendingBalance() | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong> } @else { <strong aria-label="No disponible">—</strong> }
 					</div>
 				</div>
 			</article>
@@ -86,13 +85,13 @@
 			<article class="card customer-card">
 				<div class="card-header">
 					<div>
-						<p class="eyebrow">Consulta de clientes</p>
-						<h2>Saldo por agente</h2>
+						<h2>Saldo por cliente</h2>
+						<p>Localiza un cliente y consulta su deuda vigente.</p>
 					</div>
 					<svg lucideUserRoundCheck class="section-icon" size="22"></svg>
 				</div>
 				<label for="agent-select">Selecciona un agente para consultar su saldo pendiente</label>
-				<input id="agent-search" type="search" class="form-control agent-search" [ngModel]="agentSearchTerm()" (ngModelChange)="onAgentSearchChange($event)" placeholder="Buscar por nombre, correo o identificación">
+				<input id="agent-search" type="search" class="form-control agent-search" [ngModel]="agentSearchTerm()" (ngModelChange)="onAgentSearchChange($event)" placeholder="Buscar cliente por nombre">
 				<div class="agent-picker">
 					  <select id="agent-select" class="form-control" [value]="selectedAgentId() ?? ''" (change)="onAgentChange($event)" [disabled]="!agents().length">
 						<option value="">Elige un agente</option>

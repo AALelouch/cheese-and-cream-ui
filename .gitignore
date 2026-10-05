@@ -6,7 +6,7 @@
 /out-tsc
 /bazel-out
 /.angular
-
+/.impeccable
 
 # Node
 /node_modules

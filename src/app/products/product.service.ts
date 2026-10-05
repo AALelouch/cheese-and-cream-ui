@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ProductRequest, ProductResponse } from './product';
+import { ProductIdNameResponse, ProductRequest, ProductResponse } from './product';
 import { DEFAULT_PAGE_SIZE, PageRequest, PageResponse, toPageParams } from '../shared/pagination';
 import { environment } from '../../environments/environment';
 
@@ -21,6 +21,10 @@ export class ProductService {
 
   searchProducts(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: PRODUCT_DEFAULT_SORT }): Observable<PageResponse<ProductResponse>> {
     return this.http.post<PageResponse<ProductResponse>>(`${this.apiUrl}/agent/${agentId}/search`, { term }, { params: toPageParams(request) });
+  }
+
+  searchProductIdNames(agentId: number, term: string, request: PageRequest = { page: 0, size: DEFAULT_PAGE_SIZE, sort: PRODUCT_DEFAULT_SORT }): Observable<PageResponse<ProductIdNameResponse>> {
+    return this.http.post<PageResponse<ProductIdNameResponse>>(`${this.apiUrl}/agent/${agentId}/search/id-name`, { term }, { params: toPageParams(request) });
   }
 
   createProduct(request: ProductRequest): Observable<void> {

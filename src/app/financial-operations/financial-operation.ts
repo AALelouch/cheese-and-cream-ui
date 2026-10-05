@@ -20,18 +20,23 @@ export interface FinancialOperationRequest {
   operationType: OperationType;
 }
 
-export interface FinancialOperationResponse {
+export interface FinancialOperationSummaryResponse {
   id: number;
-  productResponses: Array<{
-    id: number;
-    name: string;
-    quantity: number;
-    price: number;
-    totalPrice: number;
-  }>;
   idAgent: number;
   concept: string;
   total: number;
   operationType: OperationType;
   date: string;
+}
+
+export interface FinancialOperationProductResponse {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+  totalPrice: number;
+}
+
+export interface FinancialOperationDetailsResponse {
+  products: FinancialOperationProductResponse[];
 }

@@ -2,25 +2,31 @@
 .month-control { display: grid; gap: 7px; min-width: 178px; }
 .refresh-button { gap: 7px; }
 .loading-state, .lookup-state { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.inline-alert { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 0; }
+.inline-alert span { display: inline-flex; align-items: center; gap: 8px; }
 .loading-state { justify-content: center; min-height: 210px; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
 .spin { animation: spin 1s linear infinite; }
 
-.metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.metric-card { display: flex; gap: 14px; min-height: 142px; padding: 20px; background: var(--ink-raised); border: 1px solid var(--line); border-radius: var(--radius); border-top: 3px solid var(--butter); }
-.metric-revenue { border-top-color: var(--success); }
-.metric-profit { border-top-color: var(--info); }
-.metric-pending { border-top-color: var(--danger); }
+.metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; background: var(--ink-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.metric-card { position: relative; display: flex; gap: 15px; min-height: 154px; padding: 24px; }
+.metric-card + .metric-card { border-left: 1px solid var(--line); }
+.metric-card::after { position: absolute; inset: auto 24px 0; height: 2px; background: var(--butter); content: ''; opacity: .85; }
+.metric-revenue::after { background: var(--success); }
+.metric-profit::after { background: var(--info); }
+.metric-pending::after { background: var(--danger); }
 .metric-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; color: var(--butter); background: var(--cream-wash); border-radius: 50%; }
 .metric-revenue .metric-icon { color: var(--success); background: rgb(141 187 145 / .14); }
 .metric-profit .metric-icon { color: var(--info); background: rgb(131 184 201 / .14); }
 .metric-pending .metric-icon { color: var(--danger); background: var(--danger-wash); }
 .metric-label, .metric-helper, .balance-row span, .selected-balance span { margin: 0; color: var(--text-muted); font-size: .82rem; }
 .metric-value { margin: 7px 0 3px; color: var(--cream); font-family: 'Space Grotesk', sans-serif; font-size: clamp(1.45rem, 2vw, 1.9rem); font-weight: 700; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.metric-value.unavailable { color: var(--text-subtle); }
 
 .details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.details-grid .card { box-shadow: none; }
+.details-grid .card { box-shadow: var(--shadow-soft); }
 .details-grid .card-header { margin-bottom: 18px; }
 .details-grid h2 { margin: 2px 0 0; color: var(--cream); font-family: 'Space Grotesk', sans-serif; font-size: 1.18rem; }
+.details-grid .card-header p { max-width: 42ch; margin: 6px 0 0; color: var(--text-muted); font-size: .82rem; line-height: 1.45; }
 .section-icon { color: var(--butter); }
 .balance-list { display: grid; gap: 10px; }
 .balance-row, .selected-balance { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); }
@@ -34,5 +40,5 @@
 .selected-balance { margin-top: 14px; padding: 14px; background: var(--cream-wash); border: 1px solid rgb(225 184 93 / .24); border-radius: var(--radius-sm); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 900px) { .metrics-grid, .details-grid { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .actions, .month-control { width: 100%; } .actions .btn, .month-control { flex: 1; } .metric-card { min-height: 124px; } }
+@media (max-width: 900px) { .metrics-grid, .details-grid { grid-template-columns: 1fr; } .metric-card + .metric-card { border-top: 1px solid var(--line); border-left: 0; } }
+@media (max-width: 560px) { .actions, .month-control { width: 100%; } .actions .btn, .month-control { flex: 1; } .metric-card { min-height: 124px; } .inline-alert { align-items: flex-start; flex-direction: column; } }

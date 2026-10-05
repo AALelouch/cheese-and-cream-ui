@@ -1,12 +1,11 @@
 <div class="page">
   <div class="page-header">
     <div>
-      <p class="eyebrow">Operaciones</p>
-      <h2>Operaciones Financieras</h2>
+      <h2>Operaciones financieras</h2>
       <p class="subtitle">Selecciona un cliente o proveedor para ver sus operaciones.</p>
     </div>
     <div class="actions">
-      <button class="btn btn-primary" (click)="openOperationModal(operationModal)">Crear Operacion</button>
+      <button class="btn btn-primary" (click)="openOperationModal(operationModal)">Crear operación</button>
     </div>
   </div>
 
@@ -19,7 +18,7 @@
           <button type="button" class="party-role-option" [class.active]="partyRole === 'PROVIDER'" [attr.aria-pressed]="partyRole === 'PROVIDER'" (click)="onPartyRoleChange('PROVIDER')">Proveedores</button>
         </div>
         <label class="visually-hidden" for="operationAgentSearch">Buscar agentes</label>
-        <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre, correo o identificación">
+        <input id="operationAgentSearch" type="search" class="form-control" [(ngModel)]="agentSearchTerm" (ngModelChange)="onAgentSearchChange($event)" placeholder="Nombre del agente">
       </div>
     </div>
     <div *ngIf="isLoadingAgents" class="field-note" aria-live="polite">Buscando {{ partyRole === 'CLIENT' ? 'clientes' : 'proveedores' }}…</div>
@@ -53,12 +52,12 @@
       <table class="table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Fecha</th>
-            <th>Tipo</th>
-            <th>Concepto</th>
-            <th>Total</th>
-            <th>Detalles</th>
+            <th scope="col">ID</th>
+            <th scope="col">Fecha</th>
+            <th scope="col">Tipo</th>
+            <th scope="col">Concepto</th>
+            <th scope="col">Total</th>
+            <th scope="col">Detalles</th>
           </tr>
         </thead>
         <tbody>
@@ -103,7 +102,7 @@
   <ng-template #operationModal>
     <div class="modal-header">
       <h4 class="modal-title pull-left">Crear Operacion</h4>
-      <button type="button" class="close pull-right" aria-label="Close" (click)="modalRef?.hide()">
+      <button type="button" class="close pull-right" aria-label="Cerrar" (click)="modalRef?.hide()">
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
@@ -246,7 +245,7 @@
   <ng-template #operationDetailModal>
     <div class="modal-header">
       <h4 class="modal-title pull-left">Detalle de Operacion</h4>
-      <button type="button" class="close pull-right" aria-label="Close" (click)="closeModal()">
+      <button type="button" class="close pull-right" aria-label="Cerrar" (click)="closeModal()">
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
@@ -278,18 +277,27 @@
 
       <div class="detail-products">
         <div class="detail-section-title">Productos</div>
-        <div *ngIf="operation.productResponses.length; else noProducts" class="detail-product-list">
-          <div class="detail-product-row" *ngFor="let product of operation.productResponses; trackBy: trackByOperationProductId">
-            <div class="detail-product-main">
-              <div class="detail-product-name">{{ product.name }}</div>
-            </div>
-            <dl class="detail-product-values">
-              <div><dt>Cantidad</dt><dd>{{ product.quantity }}</dd></div>
-              <div><dt>Precio unitario</dt><dd>{{ product.price | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
-              <div><dt>Total</dt><dd>{{ product.totalPrice | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
-            </dl>
-          </div>
+        <div *ngIf="isLoadingOperationDetails" class="empty-state empty-state-inline" aria-live="polite">Cargando productos…</div>
+        <div *ngIf="operationDetailsError" class="inline-alert detail-error" role="alert">
+          <span>{{ operationDetailsError }}</span>
+          <button type="button" class="btn btn-xs btn-outline" (click)="retryOperationDetails()" [disabled]="isLoadingOperationDetails">Reintentar</button>
         </div>
+        <ng-container *ngIf="!isLoadingOperationDetails && !operationDetailsError">
+          <ng-container *ngIf="operationDetails as details">
+            <div *ngIf="details.products.length; else noProducts" class="detail-product-list">
+              <div class="detail-product-row" *ngFor="let product of details.products; trackBy: trackByOperationProductId">
+                <div class="detail-product-main">
+                  <div class="detail-product-name">{{ product.name }}</div>
+                </div>
+                <dl class="detail-product-values">
+                  <div><dt>Cantidad</dt><dd>{{ product.quantity }}</dd></div>
+                  <div><dt>Precio unitario</dt><dd>{{ product.price | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+                  <div><dt>Total</dt><dd>{{ product.totalPrice | currency:'COP':'symbol-narrow':'1.0-2':'es-CO' }}</dd></div>
+                </dl>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
         <ng-template #noProducts>
           <div class="empty-state empty-state-inline">No hay productos asociados a esta operacion.</div>
         </ng-template>
